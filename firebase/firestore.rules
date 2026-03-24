@@ -1,0 +1,96 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Aligné avec Storage + AdminShell : claims OU doc users/{uid}.role == "admin"
+    // (la whitelist email côté front ne peut pas être vérifiée ici)
+    function isAdmin() {
+      return signedIn() && (
+        request.auth.token.admin == true
+        || request.auth.token.role == "admin"
+        || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"
+        )
+      );
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    match /offers/{offerId} {
+      // Public : offres actives et non expirées. Admin : lecture de toutes les offres (liste back-office).
+      allow read: if isAdmin()
+        || (
+          resource.data.isActive == true
+          && (!(resource.data.expiresAt is timestamp) || resource.data.expiresAt > request.time)
+        );
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if resource.data.active == true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /favorites/{favoriteId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.offerId is string;
+      allow update, delete: if isOwner(resource.data.userId);
+    }
+
+    match /users/{userId}/favorites/{offerId} {
+      allow read, create, update, delete: if isOwner(userId) || isAdmin();
+    }
+
+    match /tickets/{ticketId} {
+      allow read: if isOwner(resource.data.userId) || isOwner(resource.data.uid) || isAdmin();
+      allow create: if signedIn()
+        && (
+          (request.resource.data.userId == request.auth.uid)
+          || (request.resource.data.uid == request.auth.uid)
+        );
+      allow update: if isAdmin()
+        || ((isOwner(resource.data.userId) || isOwner(resource.data.uid)) && (resource.data.status == "pending" || resource.data.status == "submitted"));
+      allow delete: if isAdmin();
+    }
+
+    match /offerSuggestions/{suggestionId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == "pending";
+      allow update: if isAdmin()
+        || (isOwner(resource.data.userId) && resource.data.status == "pending");
+      allow delete: if isAdmin();
+    }
+
+    match /offerStats/{offerId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+    }
+
+    match /users/{userId}/limits/{dayKey} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) || isAdmin();
+    }
+
+    // Compteur quotidien des suggestions (createOfferSuggestion / offerSuggestions.ts)
+    match /users/{userId}/offerSuggestionDaily/{dateId} {
+      allow read, create, update: if isOwner(userId);
+    }
+  }
+}

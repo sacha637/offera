@@ -1,0 +1,33 @@
+{
+  "categories": [
+    { "id": "food", "name": "Restauration", "active": true, "order": 1 },
+    { "id": "tech", "name": "Tech", "active": true, "order": 2 },
+    { "id": "home", "name": "Maison", "active": true, "order": 3 }
+  ],
+  "offers": [
+    {
+      "id": "offre-1",
+      "title": "Cashback 10% sur les courses",
+      "partner": "Market+",
+      "description": "Recevez 10% de cashback sur votre prochain panier.",
+      "categoryId": "food",
+      "published": true,
+      "featured": true,
+      "priority": 9,
+      "expiresAt": "2026-03-10",
+      "popularity": 1240
+    },
+    {
+      "id": "offre-2",
+      "title": "-25% sur les écouteurs sans fil",
+      "partner": "Soundia",
+      "description": "Offre exclusive Offera sur les best-sellers.",
+      "categoryId": "tech",
+      "published": true,
+      "featured": true,
+      "priority": 8,
+      "expiresAt": "2026-02-12",
+      "popularity": 980
+    }
+  ]
+}

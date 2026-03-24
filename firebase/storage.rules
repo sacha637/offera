@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && (
+          request.auth.token.admin == true
+          || request.auth.token.role == "admin"
+          || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == "admin"
+        );
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    match /offers/{offerId}/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /offers/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /tickets/{userId}/{ticketId}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId);
+    }
+
+    match /tickets/{userId}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId);
+    }
+
+    match /suggestions/{userId}/{suggestionId}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId);
+    }
+  }
+}
