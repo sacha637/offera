@@ -60,7 +60,7 @@ function badgeVariant(badge: string) {
 }
 
 const chipLinkClass =
-  "inline-flex rounded-full border border-slate-200/90 bg-white px-3.5 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-emerald-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-950/40";
+  "inline-flex rounded-full border border-slate-200/90 bg-white px-3.5 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-emerald-900";
 
 export default function HomePage() {
   const [topOffers, setTopOffers] = useState<Offer[]>([]);
@@ -134,11 +134,11 @@ export default function HomePage() {
       {loadError ? (
         <div
           role="alert"
-          className="flex flex-col gap-3 rounded-2xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-3 rounded-2xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm sm:flex-row sm:items-center sm:justify-between"
         >
           <div>
-            <p className="font-semibold text-amber-950 dark:text-amber-50">Offres momentanément indisponibles</p>
-            <p className="mt-1 text-sm leading-relaxed text-amber-900 dark:text-amber-100">{loadError}</p>
+            <p className="font-semibold text-amber-950">Offres momentanément indisponibles</p>
+            <p className="mt-1 text-sm leading-relaxed text-amber-900">{loadError}</p>
           </div>
           <Button
             type="button"
@@ -153,13 +153,15 @@ export default function HomePage() {
 
       <section className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-10">
         <div className="flex flex-col justify-center gap-5 sm:gap-6">
-          <Badge variant="success">Nouveau sur {BRAND_NAME}</Badge>
+          <Badge variant="success" className="text-emerald-950">
+            Nouveau sur {BRAND_NAME}
+          </Badge>
 
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl md:text-[2.75rem] md:leading-tight">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl md:text-[2.75rem] md:leading-tight">
             Bons plans en magasin, réductions à combiner, offres limitées.
           </h1>
 
-          <p className="text-base leading-relaxed text-slate-600 dark:text-slate-300 sm:text-lg">
+          <p className="text-base leading-relaxed text-slate-600 sm:text-lg">
             {BRAND_NAME} met en avant des offres concrètes en point de vente : promos, codes et bons plans
             selon les conditions affichées par chaque enseigne.
           </p>

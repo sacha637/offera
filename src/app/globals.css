@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Dark mode = uniquement avec la classe .dark sur un ancêtre (pas prefers-color-scheme).
+   Sinon, sur mobile en « thème sombre » système, les classes dark: s’appliquent avec un fond
+   encore clair → texte blanc / très pâle illisible. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   color-scheme: light;
   --offera-accent: #059669;
