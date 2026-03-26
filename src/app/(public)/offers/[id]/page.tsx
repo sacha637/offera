@@ -15,6 +15,7 @@ import { Badge } from "../../../../components/ui/Badge";
 import { Button } from "../../../../components/ui/Button";
 import { Card } from "../../../../components/ui/Card";
 import { db } from "../../../../lib/firebase/client";
+import { isOfferExpired } from "../../../../lib/offersDisplay";
 import { useAuth } from "../../../../components/providers/AuthProvider";
 
 type OfferLink = {
@@ -129,9 +130,7 @@ export default function OfferDetailPage() {
       .filter((l) => l.url.length > 0);
   })();
 
-  const expired = Boolean(
-    offer?.expiresAt?.toDate && offer.expiresAt.toDate() < new Date()
-  );
+  const expired = offer ? isOfferExpired(offer.expiresAt) : false;
 
   const imgSrc =
     typeof offer?.imageUrl === "string" && offer.imageUrl.trim().length > 0
@@ -230,11 +229,15 @@ export default function OfferDetailPage() {
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-500">❤️ {offer.favoritesCount ?? 0}</span>
 
-          {offer.expiresAt?.toDate && (
+          {offer.expiresAt ? (
             <span className="text-xs text-slate-500">
-              Expire {offer.expiresAt.toDate().toLocaleDateString("fr-FR")}
+              {typeof (offer.expiresAt as { toDate?: () => Date }).toDate === "function"
+                ? `Expire ${(offer.expiresAt as { toDate: () => Date }).toDate().toLocaleDateString("fr-FR")}`
+                : typeof offer.expiresAt === "string" && offer.expiresAt.trim()
+                  ? `Expire ${new Date(`${offer.expiresAt}T12:00:00`).toLocaleDateString("fr-FR")}`
+                  : null}
             </span>
-          )}
+          ) : null}
         </div>
       </div>
 

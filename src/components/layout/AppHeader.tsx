@@ -13,9 +13,9 @@ export function AppHeader() {
             {BRAND_NAME.slice(0, 1).toUpperCase()}
           </div>
 
-          <div>
-            <p className="text-base font-bold text-slate-900">{BRAND_NAME}</p>
-            <p className="text-xs text-slate-500">{BRAND_TAGLINE}</p>
+          <div className="min-w-0">
+            <p className="truncate text-base font-bold text-slate-900">{BRAND_NAME}</p>
+            <p className="hidden text-xs text-slate-500 sm:block">{BRAND_TAGLINE}</p>
           </div>
         </Link>
 

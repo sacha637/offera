@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
@@ -12,7 +12,11 @@ import { Input } from "../../../components/ui/Input";
 
 import { db } from "../../../lib/firebase/client";
 import { categories } from "../../../lib/mock";
-import { filterAndSortOffers } from "../../../lib/offersDisplay";
+import {
+  filterAndSortOffers,
+  isOfferExpired,
+  isOfferPubliclyActive,
+} from "../../../lib/offersDisplay";
 
 import { useAuth } from "../../../components/providers/AuthProvider";
 import { isOfferFavorited, toggleFavorite } from "../../../lib/firebase/favorites";
@@ -32,17 +36,6 @@ type Offer = {
   createdAt?: { toMillis?: () => number };
   expiresAt?: unknown;
 };
-
-function isExpired(expiresAt: unknown) {
-  if (!expiresAt) return false;
-  if (typeof (expiresAt as { toDate?: () => Date }).toDate === "function") {
-    return (expiresAt as { toDate: () => Date }).toDate() < new Date();
-  }
-  if (typeof expiresAt === "string" && expiresAt.trim()) {
-    return new Date(`${expiresAt}T23:59:59`).getTime() < Date.now();
-  }
-  return false;
-}
 
 function formatExpiry(expiresAt: unknown) {
   if (!expiresAt) return null;
@@ -83,15 +76,16 @@ export default function OffersPage() {
       setError(null);
 
       try {
-        const q = query(collection(db, "offers"), where("isActive", "==", true));
-        const snapshot = await getDocs(q);
+        const snapshot = await getDocs(collection(db, "offers"));
 
         const data = snapshot.docs.map((docSnap) => ({
           ...(docSnap.data() as Record<string, unknown>),
           id: docSnap.id,
         })) as Offer[];
 
-        const activeAndNotExpired = data.filter((o) => !isExpired(o.expiresAt));
+        const activeAndNotExpired = data.filter(
+          (o) => isOfferPubliclyActive(o) && !isOfferExpired(o.expiresAt)
+        );
 
         setOffers(activeAndNotExpired);
       } catch (e: unknown) {
@@ -270,12 +264,12 @@ export default function OffersPage() {
 
             return (
               <Card key={offer.id} className="flex flex-col gap-4">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-start justify-between gap-2 sm:items-center">
                   <Badge variant={offer.isFeatured ? "info" : "success"}>
                     {offer.isFeatured ? "À la une" : "Offre"}
                   </Badge>
 
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-2">
                     <button
                       type="button"
                       onClick={() => onToggleFav(String(offer.id))}

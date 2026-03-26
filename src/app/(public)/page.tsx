@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 
 import { LinkButton } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
@@ -12,7 +12,11 @@ import { Card } from "../../components/ui/Card";
 import { categories } from "../../lib/mock";
 import { BRAND_NAME } from "../../lib/brand";
 import { db } from "../../lib/firebase/client";
-import { sortTopByFavoritesThenRecent } from "../../lib/offersDisplay";
+import {
+  isOfferExpired,
+  isOfferPubliclyActive,
+  sortTopByFavoritesThenRecent,
+} from "../../lib/offersDisplay";
 
 type Offer = {
   id: string;
@@ -29,17 +33,6 @@ type Offer = {
   badge?: string;
   createdAt?: { toMillis?: () => number };
 };
-
-function isExpired(expiresAt: unknown) {
-  if (!expiresAt) return false;
-  if (typeof (expiresAt as { toDate?: () => Date }).toDate === "function") {
-    return (expiresAt as { toDate: () => Date }).toDate() < new Date();
-  }
-  if (typeof expiresAt === "string" && expiresAt.trim()) {
-    return new Date(`${expiresAt}T23:59:59`).getTime() < Date.now();
-  }
-  return false;
-}
 
 function safeImageSrc(url?: string) {
   return url && url.trim().length > 0 ? url : "/images/offer-placeholder.svg";
@@ -82,8 +75,7 @@ export default function HomePage() {
       setLoading(true);
 
       try {
-        const q = query(collection(db, "offers"), where("isActive", "==", true));
-        const snap = await getDocs(q);
+        const snap = await getDocs(collection(db, "offers"));
 
         const raw: Offer[] = snap.docs.map((d) => {
           const v = d.data() as Record<string, unknown>;
@@ -95,7 +87,7 @@ export default function HomePage() {
             imageUrl: (v.imageUrl as string) ?? "",
             category: (v.category as string) ?? "",
             link: (v.link as string) ?? "",
-            isActive: !!v.isActive,
+            isActive: typeof v.isActive === "boolean" ? v.isActive : undefined,
             isFeatured: !!v.isFeatured,
             favoritesCount: (v.favoritesCount as number) ?? 0,
             expiresAt: v.expiresAt,
@@ -104,7 +96,9 @@ export default function HomePage() {
           };
         });
 
-        const active = raw.filter((o) => !isExpired(o.expiresAt));
+        const active = raw.filter(
+          (o) => isOfferPubliclyActive(o) && !isOfferExpired(o.expiresAt)
+        );
         const sorted = sortTopByFavoritesThenRecent(active);
         setTopOffers(sorted.slice(0, 6));
       } catch (e) {
@@ -244,13 +238,17 @@ export default function HomePage() {
                     <p className="text-sm text-slate-600 dark:text-slate-300">{offer.description}</p>
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-xs font-semibold text-slate-500">
                       {offer.partner || "—"} · {offer.favoritesCount ?? 0} favori
                       {(offer.favoritesCount ?? 0) > 1 ? "s" : ""}
                     </span>
 
-                    <LinkButton href={`/offers/${encodeURIComponent(String(offer.id))}`} variant="secondary">
+                    <LinkButton
+                      href={`/offers/${encodeURIComponent(String(offer.id))}`}
+                      variant="secondary"
+                      className="w-full shrink-0 sm:w-auto"
+                    >
                       Voir l’offre
                     </LinkButton>
                   </div>

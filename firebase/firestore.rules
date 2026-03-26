@@ -24,10 +24,11 @@ service cloud.firestore {
     }
 
     match /offers/{offerId} {
-      // Public : offres actives et non expirées. Admin : lecture de toutes les offres (liste back-office).
+      // Public : actives (absence du champ = actif, comme le front) et non expirées (expiresAt timestamp).
+      // Les chaînes / autres types d’expiration sont filtrés côté client.
       allow read: if isAdmin()
         || (
-          resource.data.isActive == true
+          resource.data.isActive != false
           && (!(resource.data.expiresAt is timestamp) || resource.data.expiresAt > request.time)
         );
       allow create, update, delete: if isAdmin();

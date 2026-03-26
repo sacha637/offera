@@ -1,5 +1,22 @@
 import type { Category } from "./types";
 
+/** Champ absent ou true = visible publiquement ; false masque explicitement. */
+export function isOfferPubliclyActive(v: { isActive?: unknown }): boolean {
+  return v.isActive !== false;
+}
+
+/** Date d’expiration Firestore (timestamp), chaîne YYYY-MM-DD, ou absent. */
+export function isOfferExpired(expiresAt: unknown): boolean {
+  if (!expiresAt) return false;
+  if (typeof (expiresAt as { toDate?: () => Date }).toDate === "function") {
+    return (expiresAt as { toDate: () => Date }).toDate() < new Date();
+  }
+  if (typeof expiresAt === "string" && expiresAt.trim()) {
+    return new Date(`${expiresAt}T23:59:59`).getTime() < Date.now();
+  }
+  return false;
+}
+
 /** Filtre par catégorie (libellé admin vs id mock) */
 export function offerMatchesCategory(
   offerCategory: string | undefined,
