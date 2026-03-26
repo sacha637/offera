@@ -227,7 +227,9 @@ export default function OfferDetailPage() {
         </Badge>
 
         <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-500">❤️ {offer.favoritesCount ?? 0}</span>
+          <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+            {offer.favoritesCount ?? 0} favori{(offer.favoritesCount ?? 0) > 1 ? "s" : ""}
+          </span>
 
           {offer.expiresAt ? (
             <span className="text-xs text-slate-500">
@@ -361,7 +363,7 @@ export default function OfferDetailPage() {
       ) : null}
 
       <Button onClick={toggleFavorite} disabled={favLoading}>
-        {isFav ? "💚 Retirer des favoris Offera" : "❤️ Ajouter aux favoris Offera"}
+        {isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
       </Button>
     </div>
   );

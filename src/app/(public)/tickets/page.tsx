@@ -53,7 +53,6 @@ export default function TicketsPage() {
   const [loadingTickets, setLoadingTickets] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // 🔐 Redirection si non connecté
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
@@ -68,7 +67,7 @@ export default function TicketsPage() {
       setTickets(list);
     } catch (e: any) {
       console.error(e);
-      setError(e?.message ?? "Impossible de charger tes tickets.");
+      setError(e?.message ?? "Impossible de charger vos tickets.");
     } finally {
       setLoadingTickets(false);
     }
@@ -97,7 +96,7 @@ export default function TicketsPage() {
     setError(null);
     setSuccess(null);
 
-    if (!uid) return setError("Tu dois être connecté.");
+    if (!uid) return setError("Vous devez être connecté.");
     if (!file) return setError("Ajoute une image.");
     if (!isImage(file)) return setError("Le fichier doit être une image.");
     if (!title.trim() || !store.trim()) return setError("Titre et enseigne obligatoires.");
@@ -112,7 +111,7 @@ export default function TicketsPage() {
         file,
       });
 
-      setSuccess("Ticket envoyé ✅");
+      setSuccess("Votre ticket a bien été envoyé.");
       setTitle("");
       setStore("");
       setFile(null);
@@ -129,7 +128,7 @@ export default function TicketsPage() {
   async function onDelete(ticket: TicketItem) {
     if (!uid) return;
 
-    const ok = window.confirm("Tu es sûr de vouloir supprimer ce ticket ?");
+    const ok = window.confirm("Supprimer définitivement ce ticket ?");
     if (!ok) return;
 
     try {
@@ -143,7 +142,7 @@ export default function TicketsPage() {
         storagePath: ticket.storagePath,
       });
 
-      setSuccess("Ticket supprimé ✅");
+      setSuccess("Ce ticket a été supprimé.");
       await refreshTickets();
     } catch (e: any) {
       console.error(e);
@@ -156,20 +155,24 @@ export default function TicketsPage() {
   return (
     <div className="grid gap-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-          Tickets Offera
-        </h1>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Après achat
+          </p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Tickets
+          </h1>
+        </div>
 
-        {/* ✅ Bouton proposer une offre */}
         <Button variant="secondary" onClick={() => router.push("/offers/suggest")}>
-          Proposer une offre
+          Suggérer une offre
         </Button>
       </div>
 
-      {/* ✅ FORMULAIRE EN HAUT */}
       <Card className="grid gap-4 p-6">
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          Ajoutez une photo lisible de votre ticket pour traiter votre demande selon les règles en vigueur.
+        <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+          Envoyez une photo nette et lisible de votre ticket de caisse pour que nous puissions traiter votre
+          demande correctement.
         </p>
 
         <Input
@@ -191,14 +194,13 @@ export default function TicketsPage() {
             Photo du ticket
           </p>
 
-          {/* ✅ Consignes claires */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-            <p className="font-semibold">Pour que ton ticket soit validé :</p>
-            <ul className="mt-2 list-disc pl-5">
-              <li>Ticket entier visible (haut + bas), pas coupé.</li>
-              <li>Photo nette, sans flou, sans reflets.</li>
-              <li>Date + magasin + total lisibles.</li>
-              <li>Une seule photo = un ticket (pas de montage).</li>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+            <p className="font-semibold text-slate-900 dark:text-white">Pour une validation rapide :</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-slate-800 dark:text-slate-200">
+              <li>Ticket entier visible (haut et bas), non coupé.</li>
+              <li>Photo nette, sans flou ni reflet gênant.</li>
+              <li>Date, magasin et montant lisibles.</li>
+              <li>Une photo par ticket, sans montage.</li>
             </ul>
           </div>
 
@@ -233,7 +235,6 @@ export default function TicketsPage() {
         </Button>
       </Card>
 
-      {/* ✅ LISTE EN BAS */}
       <Card className="grid gap-4 p-6">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">

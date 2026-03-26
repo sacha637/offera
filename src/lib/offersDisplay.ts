@@ -17,6 +17,13 @@ export function isOfferExpired(expiresAt: unknown): boolean {
   return false;
 }
 
+function foldForSearch(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 /** Filtre par catégorie (libellé admin vs id mock) */
 export function offerMatchesCategory(
   offerCategory: string | undefined,
@@ -26,10 +33,10 @@ export function offerMatchesCategory(
   if (!selectedCategoryId) return true;
   const cat = allCategories.find((c) => c.id === selectedCategoryId);
   if (!cat) return true;
-  const o = (offerCategory ?? "").trim().toLowerCase();
+  const o = foldForSearch((offerCategory ?? "").trim());
   if (!o) return false;
-  const name = cat.name.toLowerCase();
-  const id = cat.id.toLowerCase();
+  const name = foldForSearch(cat.name);
+  const id = foldForSearch(cat.id);
   return o === name || o === id || o.includes(name) || name.includes(o);
 }
 
@@ -43,12 +50,12 @@ export function searchRelevanceScore(
   },
   rawQuery: string
 ): number {
-  const q = rawQuery.trim().toLowerCase();
+  const q = foldForSearch(rawQuery.trim());
   if (!q) return 0;
-  const t = (offer.title ?? "").toLowerCase();
-  const d = (offer.description ?? "").toLowerCase();
-  const p = (offer.partner ?? "").toLowerCase();
-  const c = (offer.category ?? "").toLowerCase();
+  const t = foldForSearch(offer.title ?? "");
+  const d = foldForSearch(offer.description ?? "");
+  const p = foldForSearch(offer.partner ?? "");
+  const c = foldForSearch(offer.category ?? "");
   let s = 0;
   if (t.includes(q)) s += 100;
   if (t.startsWith(q)) s += 30;
@@ -80,13 +87,15 @@ export function filterAndSortOffers<T extends OfferSortable>(
   }
 ): T[] {
   const { search, categoryId, categories } = options;
-  const q = search.trim().toLowerCase();
+  const q = foldForSearch(search.trim());
 
   let list = offers.filter((o) => offerMatchesCategory(o.category, categoryId, categories));
 
   if (q) {
     list = list.filter((o) => {
-      const hay = `${o.title ?? ""} ${o.description ?? ""} ${o.partner ?? ""} ${o.category ?? ""}`.toLowerCase();
+      const hay = foldForSearch(
+        `${o.title ?? ""} ${o.description ?? ""} ${o.partner ?? ""} ${o.category ?? ""}`
+      );
       return hay.includes(q);
     });
   }

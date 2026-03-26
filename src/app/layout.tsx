@@ -16,12 +16,12 @@ export const metadata: Metadata = {
     default: `${BRAND_NAME} – Bons plans & réductions`,
     template: `%s – ${BRAND_NAME}`,
   },
-  description: `${BRAND_NAME} regroupe des offres avantageuses, des réductions à combiner et des bons plans en magasin, avec un parcours simple et sécurisé.`,
+  description: `${BRAND_NAME} : bons plans en magasin, réductions à combiner et offres sélectionnées, avec un parcours simple.`,
   metadataBase: new URL(BRAND_URL),
 
   openGraph: {
     title: `${BRAND_NAME} – Bons plans & réductions`,
-    description: `${BRAND_NAME} : offres sélectionnées, réductions et opportunités en point de vente.`,
+    description: `${BRAND_NAME} : offres en magasin et en ligne, réductions et bons plans.`,
     url: BRAND_URL,
     siteName: BRAND_NAME,
     locale: "fr_FR",
@@ -31,14 +31,14 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: `${BRAND_NAME} – Bons plans & réductions`,
-    description: `${BRAND_NAME} : offres et réductions pour optimiser vos achats.`,
+    description: `${BRAND_NAME} : bons plans et réductions pour vos achats.`,
   },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" className="light">
-      <body className={`${inter.variable} bg-white text-slate-900 antialiased`}>
+      <body className={`${inter.variable} bg-slate-50 text-slate-900 antialiased`}>
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

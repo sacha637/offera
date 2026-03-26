@@ -24,12 +24,15 @@ service cloud.firestore {
     }
 
     match /offers/{offerId} {
-      // Public : actives (absence du champ = actif, comme le front) et non expirées (expiresAt timestamp).
-      // Les chaînes / autres types d’expiration sont filtrés côté client.
+      // Public : isActive == true (obligatoire pour les requêtes list).
+      // IMPORTANT : ne pas bloquer la lecture sur expiresAt côté règles, sinon la requête
+      // `where("isActive","==",true)` échoue (permission-denied) dès qu’une seule offre active
+      // est expirée (timestamp passé). Le masquage des expirées est donc fait côté UI.
+      //
+      // Les offres sans `isActive` doivent être migrées (isActive: true) pour être visibles publiquement.
       allow read: if isAdmin()
         || (
-          resource.data.isActive != false
-          && (!(resource.data.expiresAt is timestamp) || resource.data.expiresAt > request.time)
+          resource.data.isActive == true
         );
       allow create, update, delete: if isAdmin();
     }

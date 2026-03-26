@@ -73,7 +73,7 @@ export default function AdminOfferNewPage() {
         updatedAt: serverTimestamp(),
       });
 
-      alert("Offre publiée 🎉");
+      alert("Offre publiée.");
 
       setTitle("");
       setPartner("");

@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
-
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
@@ -11,12 +9,12 @@ import { Chip } from "../../../components/ui/Chip";
 import { Input } from "../../../components/ui/Input";
 
 import { db } from "../../../lib/firebase/client";
-import { categories } from "../../../lib/mock";
 import {
-  filterAndSortOffers,
-  isOfferExpired,
-  isOfferPubliclyActive,
-} from "../../../lib/offersDisplay";
+  fetchPublicActiveOffers,
+  publicOffersErrorMessage,
+} from "../../../lib/firebase/publicOffers";
+import { categories } from "../../../lib/mock";
+import { filterAndSortOffers, isOfferExpired } from "../../../lib/offersDisplay";
 
 import { useAuth } from "../../../components/providers/AuthProvider";
 import { isOfferFavorited, toggleFavorite } from "../../../lib/firebase/favorites";
@@ -76,22 +74,19 @@ export default function OffersPage() {
       setError(null);
 
       try {
-        const snapshot = await getDocs(collection(db, "offers"));
+        const docs = await fetchPublicActiveOffers(db);
 
-        const data = snapshot.docs.map((docSnap) => ({
+        const data = docs.map((docSnap) => ({
           ...(docSnap.data() as Record<string, unknown>),
           id: docSnap.id,
         })) as Offer[];
 
-        const activeAndNotExpired = data.filter(
-          (o) => isOfferPubliclyActive(o) && !isOfferExpired(o.expiresAt)
-        );
+        const activeAndNotExpired = data.filter((o) => !isOfferExpired(o.expiresAt));
 
         setOffers(activeAndNotExpired);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Erreur de chargement.";
         console.error("Erreur Firestore:", e);
-        setError(msg);
+        setError(publicOffersErrorMessage(e));
         setOffers([]);
       } finally {
         setLoading(false);
@@ -172,31 +167,38 @@ export default function OffersPage() {
     !loading && !error && offers.length > 0 && displayed.length === 0;
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Offres</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Bons plans et réductions actives. Recherchez par mot-clé ou filtrez par catégorie.
+    <div className="flex flex-col gap-8 sm:gap-10">
+      <header className="flex flex-col gap-4 border-b border-slate-200/90 pb-6 dark:border-slate-800 sm:flex-row sm:items-end sm:justify-between">
+        <div className="max-w-2xl">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Catalogue
+          </p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+            Offres
+          </h1>
+          <p className="mt-2 text-base leading-relaxed text-slate-700 dark:text-slate-300">
+            Bons plans en magasin et en ligne : recherche, catégories, tri par pertinence puis popularité.
           </p>
         </div>
 
-        <Link href={suggestHref}>
-          <Button>Proposer une offre</Button>
+        <Link href={suggestHref} className="shrink-0 self-start sm:self-auto">
+          <Button className="w-full min-[400px]:w-auto">Suggérer une offre</Button>
         </Link>
-      </div>
+      </header>
 
-      <div className="grid gap-4">
+      <Card className="grid gap-4 p-4 sm:p-6">
         <Input
           label="Recherche"
-          placeholder="Enseigne, produit, catégorie…"
+          placeholder="Enseigne, produit, mot-clé…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
 
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Catégories</p>
-          <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+            Catégories
+          </p>
+          <div className="flex flex-wrap gap-2">
             <Chip active={categoryFilter === null} type="button" onClick={() => setCategory(null)}>
               Toutes
             </Chip>
@@ -212,45 +214,51 @@ export default function OffersPage() {
             ))}
           </div>
         </div>
-      </div>
+      </Card>
 
-      {loading && <p className="text-slate-500">Chargement des offres…</p>}
+      {loading && (
+        <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+          Chargement du catalogue…
+        </p>
+      )}
 
       {!loading && error && (
-        <Card className="border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/40">
-          <p className="text-sm text-red-800 dark:text-red-200">
-            Impossible de charger les offres. Vérifiez votre connexion ou réessayez plus tard.
-          </p>
+        <Card className="border-red-200 bg-red-50 p-5 dark:border-red-900/60 dark:bg-red-950/35">
+          <p className="text-sm font-semibold text-red-900 dark:text-red-100">Impossible d’afficher les offres</p>
+          <p className="mt-2 text-sm leading-relaxed text-red-800/95 dark:text-red-200/90">{error}</p>
         </Card>
       )}
 
       {!loading && !error && offers.length === 0 && (
-        <Card className="p-8">
-          <p className="text-center text-sm text-slate-600 dark:text-slate-400">
-            Aucune offre disponible pour le moment. Revenez bientôt.
+        <Card className="p-8 text-center">
+          <p className="text-sm font-semibold text-slate-900 dark:text-white">Aucune offre publiée pour l’instant</p>
+          <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+            Revenez bientôt ou proposez une offre via le bouton ci-dessus.
           </p>
         </Card>
       )}
 
       {!loading && !error && emptyBecauseFilter && (
         <Card className="p-8">
-          <p className="text-center text-sm text-slate-600 dark:text-slate-400">
-            Aucune offre ne correspond à votre recherche ou à cette catégorie. Modifiez les filtres ou
-            effacez la recherche.
+          <p className="text-center text-sm font-semibold text-slate-900 dark:text-white">
+            Aucun résultat pour ces critères
           </p>
-          <div className="mt-4 flex justify-center gap-2">
+          <p className="mt-2 text-center text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+            Élargissez la recherche ou réinitialisez les filtres.
+          </p>
+          <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
             <Button variant="secondary" type="button" onClick={() => setSearch("")}>
               Effacer la recherche
             </Button>
             <Button type="button" onClick={() => setCategory(null)}>
-              Toutes les catégories
+              Afficher toutes les catégories
             </Button>
           </div>
         </Card>
       )}
 
       {!loading && !error && displayed.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-5 sm:grid-cols-2">
           {displayed.map((offer) => {
             const imgSrc =
               offer.imageUrl && offer.imageUrl.trim()
@@ -263,10 +271,13 @@ export default function OffersPage() {
             const exp = formatExpiry(offer.expiresAt);
 
             return (
-              <Card key={offer.id} className="flex flex-col gap-4">
-                <div className="flex flex-wrap items-start justify-between gap-2 sm:items-center">
+              <Card
+                key={offer.id}
+                className="flex flex-col gap-4 transition-shadow hover:shadow-md dark:hover:shadow-none"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
                   <Badge variant={offer.isFeatured ? "info" : "success"}>
-                    {offer.isFeatured ? "À la une" : "Offre"}
+                    {offer.isFeatured ? "À la une" : "Bonne affaire"}
                   </Badge>
 
                   <div className="flex min-w-0 shrink-0 flex-wrap items-center justify-end gap-2">
@@ -274,43 +285,53 @@ export default function OffersPage() {
                       type="button"
                       onClick={() => onToggleFav(String(offer.id))}
                       disabled={busy}
-                      className="rounded-xl border border-slate-200 px-3 py-1 text-xs font-semibold dark:border-slate-600"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:border-emerald-300 hover:text-emerald-800 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-emerald-500/50"
                       title="Favoris"
                     >
-                      {isFav ? "Favori" : "Ajouter"} · {favCount}
+                      {isFav ? "En favori" : "Favori"} · {favCount}
                     </button>
-                    {exp ? <span className="text-xs text-slate-500">Fin {exp}</span> : null}
+                    {exp ? (
+                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                        Fin {exp}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
 
-                <img
-                  src={imgSrc}
-                  alt={`Illustration ${offer.title ?? "Offre"}`}
-                  className="h-40 w-full rounded-2xl object-cover"
-                  loading="lazy"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = "/placeholder-offer.png";
-                  }}
-                />
+                <div className="relative overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200/70 dark:bg-slate-800 dark:ring-slate-700">
+                  <img
+                    src={imgSrc}
+                    alt={`Visuel : ${offer.title ?? "Offre"}`}
+                    className="aspect-[16/10] h-auto w-full object-cover"
+                    loading="lazy"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = "/placeholder-offer.png";
+                    }}
+                  />
+                </div>
 
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                <div className="min-w-0">
+                  <h2 className="text-lg font-bold leading-snug text-slate-900 dark:text-white">
                     {offer.title ?? "Sans titre"}
                   </h2>
                   {offer.partner ? (
-                    <p className="text-xs font-semibold text-slate-500">{offer.partner}</p>
+                    <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                      {offer.partner}
+                    </p>
                   ) : null}
-                  <p className="mt-2 line-clamp-3 text-sm text-slate-600 dark:text-slate-300">
+                  <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
                     {offer.description ?? ""}
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-                  <span>{offer.category ?? "Autre"}</span>
+                <div className="mt-auto flex flex-col gap-3 border-t border-slate-100 pt-2 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    {offer.category ?? "Autre"}
+                  </span>
 
                   <Link
                     href={`/offers/${encodeURIComponent(String(offer.id))}`}
-                    className="font-semibold text-emerald-600 hover:underline"
+                    className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-center text-sm font-semibold text-white transition hover:bg-emerald-500 sm:inline-flex sm:w-auto"
                   >
                     Voir le détail
                   </Link>

@@ -11,9 +11,13 @@ const links = [
 export function TopNav() {
   return (
     <nav aria-label="Navigation principale" className="hidden md:flex">
-      <div className="flex items-center gap-6 text-sm font-semibold text-slate-600 dark:text-slate-300">
+      <div className="flex items-center gap-6 text-sm font-semibold text-slate-700 dark:text-slate-200">
         {links.map((link) => (
-          <Link key={link.href} href={link.href} className="hover:text-emerald-600">
+          <Link
+            key={link.href}
+            href={link.href}
+            className="transition hover:text-emerald-700 dark:hover:text-emerald-400"
+          >
             {link.label}
           </Link>
         ))}
