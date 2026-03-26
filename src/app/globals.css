@@ -2,6 +2,10 @@
 
 :root {
   color-scheme: light;
+  --offera-accent: #059669;
+  --offera-accent-soft: rgba(16, 185, 129, 0.08);
+  --offera-text: #0f172a;
+  --offera-text-muted: #475569;
 }
 
 .dark {
@@ -14,10 +18,26 @@
 
 body {
   font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  color: var(--offera-text);
+  background-color: #f8fafc;
+  background-image: radial-gradient(
+    ellipse 120% 70% at 50% -15%,
+    var(--offera-accent-soft),
+    transparent 55%
+  );
 }
 
 * {
   scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto;
+  }
+  .animate-pulse {
+    animation: none !important;
+  }
 }
 
 :focus-visible {

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
 
 import { Card } from "../../../components/ui/Card";
+import { OfferCardSkeleton } from "../../../components/ui/Skeleton";
 import { db } from "../../../lib/firebase/client";
 import { useAuth } from "../../../components/providers/AuthProvider";
 
@@ -79,15 +80,21 @@ export default function FavoritesPage() {
   }, [user?.uid]);
 
   if (loading) {
-    return <p className="text-slate-500">Chargement…</p>;
+    return (
+      <div className="grid gap-4" aria-busy aria-label="Chargement">
+        <div className="h-9 w-48 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <OfferCardSkeleton />
+          <OfferCardSkeleton />
+        </div>
+      </div>
+    );
   }
 
   if (!user) {
     return (
       <div className="grid gap-4">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-          Favoris Offera
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Favoris</h1>
 
         <Card>
           <p className="text-sm text-slate-600 dark:text-slate-300">
@@ -105,14 +112,21 @@ export default function FavoritesPage() {
   }
 
   if (loadingFavs) {
-    return <p className="text-slate-500">Chargement des favoris…</p>;
+    return (
+      <div className="grid gap-6" aria-busy aria-label="Chargement des favoris">
+        <div className="h-10 w-40 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <OfferCardSkeleton />
+          <OfferCardSkeleton />
+          <OfferCardSkeleton />
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="grid gap-6">
-      <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-        Favoris Offera
-      </h1>
+      <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Favoris</h1>
 
       {favorites.length === 0 ? (
         <Card>
@@ -149,7 +163,7 @@ export default function FavoritesPage() {
                   <p className="font-semibold text-slate-900 dark:text-white">
                     {fav.title ?? "Offre"}
                   </p>
-                  <p className="text-xs text-slate-500">{fav.partner ?? ""}</p>
+                  <p className="text-xs font-medium text-slate-600 dark:text-slate-400">{fav.partner ?? ""}</p>
                 </div>
               </Card>
             </Link>

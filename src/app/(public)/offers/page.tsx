@@ -9,10 +9,8 @@ import { Chip } from "../../../components/ui/Chip";
 import { Input } from "../../../components/ui/Input";
 
 import { db } from "../../../lib/firebase/client";
-import {
-  fetchPublicActiveOffers,
-  publicOffersErrorMessage,
-} from "../../../lib/firebase/publicOffers";
+import { fetchPublicOffersResult } from "../../../lib/firebase/publicOffers";
+import { OfferCardSkeleton } from "../../../components/ui/Skeleton";
 import { categories } from "../../../lib/mock";
 import { filterAndSortOffers, isOfferExpired } from "../../../lib/offersDisplay";
 
@@ -58,6 +56,7 @@ export default function OffersPage() {
 
   const [favMap, setFavMap] = useState<Record<string, boolean>>({});
   const [favBusyId, setFavBusyId] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -69,32 +68,48 @@ export default function OffersPage() {
   }, []);
 
   useEffect(() => {
-    const fetchOffers = async () => {
+    let cancelled = false;
+
+    async function fetchOffers() {
       setLoading(true);
       setError(null);
 
-      try {
-        const docs = await fetchPublicActiveOffers(db);
+      const result = await fetchPublicOffersResult(db);
 
-        const data = docs.map((docSnap) => ({
-          ...(docSnap.data() as Record<string, unknown>),
-          id: docSnap.id,
-        })) as Offer[];
+      if (cancelled) return;
 
-        const activeAndNotExpired = data.filter((o) => !isOfferExpired(o.expiresAt));
-
-        setOffers(activeAndNotExpired);
-      } catch (e: unknown) {
-        console.error("Erreur Firestore:", e);
-        setError(publicOffersErrorMessage(e));
+      if (result.status === "error") {
+        console.error("[Offera] catalogue:", result.kind, result.message);
+        setError(result.message);
         setOffers([]);
-      } finally {
+        setLoading(false);
+        return;
+      }
+
+      const data = result.docs.map((docSnap) => ({
+        ...(docSnap.data() as Record<string, unknown>),
+        id: docSnap.id,
+      })) as Offer[];
+
+      const activeAndNotExpired = data.filter((o) => !isOfferExpired(o.expiresAt));
+
+      setOffers(activeAndNotExpired);
+      setLoading(false);
+    }
+
+    fetchOffers().catch((e) => {
+      console.error(e);
+      if (!cancelled) {
+        setError("Impossible de charger le catalogue. Réessayez.");
+        setOffers([]);
         setLoading(false);
       }
-    };
+    });
 
-    fetchOffers();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [retryKey]);
 
   useEffect(() => {
     async function run() {
@@ -217,23 +232,44 @@ export default function OffersPage() {
       </Card>
 
       {loading && (
-        <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
-          Chargement du catalogue…
-        </p>
+        <div
+          className="grid gap-5 sm:grid-cols-2"
+          aria-busy
+          aria-label="Chargement du catalogue"
+        >
+          <OfferCardSkeleton />
+          <OfferCardSkeleton />
+          <OfferCardSkeleton />
+          <OfferCardSkeleton />
+        </div>
       )}
 
       {!loading && error && (
-        <Card className="border-red-200 bg-red-50 p-5 dark:border-red-900/60 dark:bg-red-950/35">
-          <p className="text-sm font-semibold text-red-900 dark:text-red-100">Impossible d’afficher les offres</p>
-          <p className="mt-2 text-sm leading-relaxed text-red-800/95 dark:text-red-200/90">{error}</p>
+        <Card className="border border-red-200/90 bg-red-50 p-5 dark:border-red-900/50 dark:bg-red-950/40">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-red-950 dark:text-red-100">
+                Impossible d’afficher le catalogue
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-red-900 dark:text-red-200/95">{error}</p>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              className="shrink-0 self-start border-red-200 bg-white text-red-900 hover:bg-red-50 dark:border-red-800 dark:bg-red-950 dark:text-red-100"
+              onClick={() => setRetryKey((k) => k + 1)}
+            >
+              Réessayer
+            </Button>
+          </div>
         </Card>
       )}
 
       {!loading && !error && offers.length === 0 && (
-        <Card className="p-8 text-center">
+        <Card className="border-dashed border-slate-300 p-8 text-center dark:border-slate-600">
           <p className="text-sm font-semibold text-slate-900 dark:text-white">Aucune offre publiée pour l’instant</p>
           <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-            Revenez bientôt ou proposez une offre via le bouton ci-dessus.
+            Revenez bientôt ou proposez une offre via le bouton en haut de page.
           </p>
         </Card>
       )}
@@ -258,7 +294,7 @@ export default function OffersPage() {
       )}
 
       {!loading && !error && displayed.length > 0 && (
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-6 sm:grid-cols-2">
           {displayed.map((offer) => {
             const imgSrc =
               offer.imageUrl && offer.imageUrl.trim()
@@ -273,7 +309,7 @@ export default function OffersPage() {
             return (
               <Card
                 key={offer.id}
-                className="flex flex-col gap-4 transition-shadow hover:shadow-md dark:hover:shadow-none"
+                className="group flex flex-col gap-4 overflow-hidden transition-all duration-200 hover:-translate-y-[1px] hover:shadow-lg hover:shadow-slate-900/5 hover:ring-1 hover:ring-emerald-200/60 active:translate-y-0 active:shadow-md dark:hover:shadow-none dark:hover:ring-emerald-800/40"
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <Badge variant={offer.isFeatured ? "info" : "success"}>
@@ -302,16 +338,17 @@ export default function OffersPage() {
                   <img
                     src={imgSrc}
                     alt={`Visuel : ${offer.title ?? "Offre"}`}
-                    className="aspect-[16/10] h-auto w-full object-cover"
+                    className="aspect-[16/10] h-auto w-full object-cover transition-transform duration-200 group-hover:scale-[1.02] group-active:scale-[1.01]"
                     loading="lazy"
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).src = "/placeholder-offer.png";
                     }}
                   />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/10 via-transparent to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
                 </div>
 
                 <div className="min-w-0">
-                  <h2 className="text-lg font-bold leading-snug text-slate-900 dark:text-white">
+                  <h2 className="text-lg font-extrabold leading-snug tracking-tight text-slate-900 dark:text-white">
                     {offer.title ?? "Sans titre"}
                   </h2>
                   {offer.partner ? (
@@ -324,14 +361,14 @@ export default function OffersPage() {
                   </p>
                 </div>
 
-                <div className="mt-auto flex flex-col gap-3 border-t border-slate-100 pt-2 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mt-auto flex flex-col gap-3 border-t border-slate-100 pt-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
                     {offer.category ?? "Autre"}
                   </span>
 
                   <Link
                     href={`/offers/${encodeURIComponent(String(offer.id))}`}
-                    className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-center text-sm font-semibold text-white transition hover:bg-emerald-500 sm:inline-flex sm:w-auto"
+                    className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-sm shadow-emerald-600/20 transition-all duration-200 hover:bg-emerald-500 hover:shadow-md active:scale-[0.99] sm:w-auto"
                   >
                     Voir le détail
                   </Link>

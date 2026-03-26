@@ -15,7 +15,6 @@ type AuthContextValue = {
   user: User | null;
   loading: boolean;
 
-  // ✅ Auth actions
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -29,12 +28,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const safety = setTimeout(() => setLoading(false), 12_000);
     const unsub = onAuthStateChanged(auth, (u) => {
+      clearTimeout(safety);
       setUser(u);
       setLoading(false);
     });
 
-    return () => unsub();
+    return () => {
+      clearTimeout(safety);
+      unsub();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {

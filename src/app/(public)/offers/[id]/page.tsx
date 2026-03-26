@@ -14,6 +14,7 @@ import {
 import { Badge } from "../../../../components/ui/Badge";
 import { Button } from "../../../../components/ui/Button";
 import { Card } from "../../../../components/ui/Card";
+import { Skeleton } from "../../../../components/ui/Skeleton";
 import { db } from "../../../../lib/firebase/client";
 import { isOfferExpired } from "../../../../lib/offersDisplay";
 import { useAuth } from "../../../../components/providers/AuthProvider";
@@ -202,7 +203,51 @@ export default function OfferDetailPage() {
   }
 
   if (loading) {
-    return <p className="text-slate-500">Chargement…</p>;
+    return (
+      <div className="grid gap-6 sm:gap-8" aria-busy aria-label="Chargement de l’offre">
+        <div className="flex items-start justify-between gap-3">
+          <Skeleton className="h-7 w-28 rounded-full" />
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-28" />
+          </div>
+        </div>
+
+        <Skeleton className="aspect-[16/9] w-full rounded-3xl" />
+
+        <div className="space-y-3">
+          <Skeleton className="h-9 w-[85%] max-w-3xl" />
+          <Skeleton className="h-4 w-40" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-[92%]" />
+            <Skeleton className="h-4 w-[78%]" />
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Skeleton className="h-14 w-full rounded-3xl" />
+          <Skeleton className="h-14 w-full rounded-3xl" />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm ring-1 ring-slate-100/80 dark:border-slate-800 dark:bg-slate-900 dark:ring-slate-800/60">
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-10 w-full rounded-2xl" />
+              <Skeleton className="h-10 w-full rounded-2xl" />
+            </div>
+          </div>
+          <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm ring-1 ring-slate-100/80 dark:border-slate-800 dark:bg-slate-900 dark:ring-slate-800/60">
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-10 w-44 rounded-2xl" />
+              <Skeleton className="h-10 w-full rounded-2xl" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!offer) {
@@ -220,19 +265,26 @@ export default function OfferDetailPage() {
   }
 
   return (
-    <div className="grid gap-6">
-      <div className="flex items-center justify-between">
-        <Badge variant={offer.isFeatured ? "info" : "success"}>
-          {offer.isFeatured ? "Top" : "Offre"}
-        </Badge>
+    <div className="grid gap-7 sm:gap-8">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/offers"
+            className="text-sm font-semibold text-slate-700 transition hover:text-emerald-700 dark:text-slate-200 dark:hover:text-emerald-300"
+          >
+            ← Retour
+          </Link>
+        </div>
 
         <div className="flex items-center gap-3">
+          <Badge variant={offer.isFeatured ? "info" : "success"}>
+            {offer.isFeatured ? "À la une" : "Bonne affaire"}
+          </Badge>
           <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
             {offer.favoritesCount ?? 0} favori{(offer.favoritesCount ?? 0) > 1 ? "s" : ""}
           </span>
-
           {offer.expiresAt ? (
-            <span className="text-xs text-slate-500">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
               {typeof (offer.expiresAt as { toDate?: () => Date }).toDate === "function"
                 ? `Expire ${(offer.expiresAt as { toDate: () => Date }).toDate().toLocaleDateString("fr-FR")}`
                 : typeof offer.expiresAt === "string" && offer.expiresAt.trim()
@@ -243,55 +295,79 @@ export default function OfferDetailPage() {
         </div>
       </div>
 
-      <img
-        src={imgSrc}
-        alt={`Illustration ${offer.title ?? "Offre"}`}
-        className="h-64 w-full rounded-3xl object-cover"
-        loading="lazy"
-        onError={(e) => {
-          (e.currentTarget as HTMLImageElement).src = "/placeholder-offer.png";
-        }}
-      />
-
-      <div className="grid gap-3">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-          {offer.title ?? "Sans titre"}
-        </h1>
-        <p className="text-sm font-semibold text-emerald-600">
-          {offer.partner ?? ""}
-        </p>
-        <p className="text-base text-slate-600 dark:text-slate-300">
-          {offer.description ?? ""}
-        </p>
+      <div className="relative overflow-hidden rounded-3xl bg-slate-100 ring-1 ring-slate-200/70 shadow-sm dark:bg-slate-800 dark:ring-slate-700">
+        <img
+          src={imgSrc}
+          alt={`Visuel : ${offer.title ?? "Offre"}`}
+          className="aspect-[16/9] h-auto w-full object-cover"
+          loading="lazy"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = "/placeholder-offer.png";
+          }}
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/15 via-transparent to-transparent" />
       </div>
 
+      <header className="grid gap-3">
+        <div className="grid gap-2">
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+            {offer.title ?? "Sans titre"}
+          </h1>
+          {offer.partner?.trim() ? (
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+              {offer.partner}
+            </p>
+          ) : null}
+        </div>
+
+        {offer.description?.trim() ? (
+          <p className="max-w-3xl text-base leading-relaxed text-slate-700 dark:text-slate-300">
+            {offer.description}
+          </p>
+        ) : null}
+      </header>
+
       {expired ? (
-        <Card className="border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
-          Cette offre est expirée. Consultez d’autres offres actives.
+        <Card className="border-amber-200/90 bg-amber-50 text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+          <p className="text-sm font-semibold">Offre expirée</p>
+          <p className="mt-1 text-sm leading-relaxed text-amber-900 dark:text-amber-100/90">
+            Cette offre n’est plus disponible. Consultez d’autres offres actives.
+          </p>
         </Card>
       ) : null}
 
-      <Card className="grid gap-3">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-          Comment profiter de l’offre sur Offera
-        </h2>
+      <Card className="grid gap-4 border-emerald-100/80 bg-gradient-to-b from-white to-emerald-50/35 dark:border-emerald-900/30 dark:from-slate-900 dark:to-emerald-950/20">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+              Actions
+            </p>
+            <h2 className="mt-1 text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+              Profiter de l’offre
+            </h2>
+          </div>
+        </div>
 
-        <ul className="list-disc pl-6 text-sm text-slate-600 dark:text-slate-300">
-          <li>
-            Offera met en avant des réductions, codes promo et bons plans en magasin ou en ligne, selon ce
-            que le partenaire propose.
-          </li>
-          <li>
-            Ouvrez un lien si disponible, ou copiez le code promo s’il y en a un.
-          </li>
-          <li>
-            Respectez les conditions affichées chez l’enseigne (dates, produits concernés, magasins
-            participants).
-          </li>
-          <li>
-            Si votre parcours inclut l’envoi d’un ticket de caisse sur Offera, suivez les étapes indiquées
-            dans votre espace.
-          </li>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {finalLinks[0]?.url ? (
+            <a href={finalLinks[0].url} target="_blank" rel="noreferrer" className="block">
+              <Button className="w-full">Ouvrir l’offre</Button>
+            </a>
+          ) : (
+            <Button className="w-full" disabled>
+              Aucun lien disponible
+            </Button>
+          )}
+
+          <Button onClick={toggleFavorite} disabled={favLoading} variant="secondary" className="w-full">
+            {isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
+          </Button>
+        </div>
+
+        <ul className="mt-1 list-disc space-y-1 pl-6 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+          <li>Consultez les conditions chez l’enseigne (dates, produits concernés, magasins participants).</li>
+          <li>Copiez un code promo si nécessaire, puis finalisez votre achat comme indiqué.</li>
+          <li>Si une preuve d’achat est demandée, envoyez un ticket depuis votre espace.</li>
         </ul>
       </Card>
 
@@ -302,7 +378,7 @@ export default function OfferDetailPage() {
           </p>
 
           {finalLinks.length === 0 ? (
-            <p className="text-sm text-slate-600 dark:text-slate-300">
+            <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
               Aucun lien renseigné pour cette offre.
             </p>
           ) : (
@@ -313,9 +389,12 @@ export default function OfferDetailPage() {
                   href={l.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-sm text-emerald-600 underline"
+                  className="group/link flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition hover:-translate-y-[1px] hover:border-emerald-300 hover:bg-emerald-50/40 hover:text-emerald-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-emerald-500/50 dark:hover:bg-emerald-950/25"
                 >
-                  {l.label || `Lien ${idx + 1}`}
+                  <span className="min-w-0 truncate">{l.label || `Lien ${idx + 1}`}</span>
+                  <span className="shrink-0 text-slate-500 transition group-hover/link:text-emerald-700 dark:text-slate-400 dark:group-hover/link:text-emerald-300">
+                    Ouvrir →
+                  </span>
                 </Link>
               ))}
             </div>
@@ -324,7 +403,7 @@ export default function OfferDetailPage() {
           {finalLinks[0]?.url ? (
             <a href={finalLinks[0].url} target="_blank" rel="noreferrer">
               <Button variant="secondary" className="w-full">
-                Ouvrir le 1er lien
+                Ouvrir le lien principal
               </Button>
             </a>
           ) : null}
@@ -335,7 +414,7 @@ export default function OfferDetailPage() {
             Code promo
           </p>
 
-          <p className="text-2xl font-bold text-emerald-600">
+          <p className="text-2xl font-extrabold tracking-tight text-emerald-700 dark:text-emerald-300">
             {offer.promoCode?.trim() ? offer.promoCode : "—"}
           </p>
 
@@ -345,6 +424,7 @@ export default function OfferDetailPage() {
               navigator.clipboard.writeText(offer.promoCode.trim());
             }}
             disabled={!offer.promoCode?.trim()}
+            variant="secondary"
           >
             Copier le code
           </Button>
@@ -361,10 +441,6 @@ export default function OfferDetailPage() {
           </div>
         </Card>
       ) : null}
-
-      <Button onClick={toggleFavorite} disabled={favLoading}>
-        {isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
-      </Button>
     </div>
   );
 }

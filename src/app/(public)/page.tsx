@@ -3,18 +3,16 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { LinkButton } from "../../components/ui/Button";
+import { Button, LinkButton } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Card } from "../../components/ui/Card";
 
 import { categories } from "../../lib/mock";
 import { BRAND_NAME } from "../../lib/brand";
 import { db } from "../../lib/firebase/client";
-import {
-  fetchPublicActiveOffers,
-  publicOffersErrorMessage,
-} from "../../lib/firebase/publicOffers";
+import { fetchPublicOffersResult } from "../../lib/firebase/publicOffers";
 import { isOfferExpired, sortTopByFavoritesThenRecent } from "../../lib/offersDisplay";
+import { OfferCardSkeleton, OfferRowSkeleton } from "../../components/ui/Skeleton";
 
 type Offer = {
   id: string;
@@ -68,48 +66,66 @@ export default function HomePage() {
   const [topOffers, setTopOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function run() {
       setLoading(true);
       setLoadError(null);
 
-      try {
-        const docs = await fetchPublicActiveOffers(db);
+      const result = await fetchPublicOffersResult(db);
 
-        const raw: Offer[] = docs.map((d) => {
-          const v = d.data() as Record<string, unknown>;
-          return {
-            id: d.id,
-            title: (v.title as string) ?? "",
-            description: (v.description as string) ?? "",
-            partner: (v.partner as string) ?? "",
-            imageUrl: (v.imageUrl as string) ?? "",
-            category: (v.category as string) ?? "",
-            link: (v.link as string) ?? "",
-            isActive: true,
-            isFeatured: !!v.isFeatured,
-            favoritesCount: (v.favoritesCount as number) ?? 0,
-            expiresAt: v.expiresAt,
-            badge: v.badge as string | undefined,
-            createdAt: v.createdAt as Offer["createdAt"],
-          };
-        });
+      if (cancelled) return;
 
-        const active = raw.filter((o) => !isOfferExpired(o.expiresAt));
-        const sorted = sortTopByFavoritesThenRecent(active);
-        setTopOffers(sorted.slice(0, 6));
-      } catch (e) {
-        console.error(e);
-        setLoadError(publicOffersErrorMessage(e));
+      if (result.status === "error") {
+        console.error("[Offera] offres publiques:", result.kind, result.message);
+        setLoadError(result.message);
         setTopOffers([]);
-      } finally {
         setLoading(false);
+        return;
       }
+
+      const raw: Offer[] = result.docs.map((d) => {
+        const v = d.data() as Record<string, unknown>;
+        return {
+          id: d.id,
+          title: (v.title as string) ?? "",
+          description: (v.description as string) ?? "",
+          partner: (v.partner as string) ?? "",
+          imageUrl: (v.imageUrl as string) ?? "",
+          category: (v.category as string) ?? "",
+          link: (v.link as string) ?? "",
+          isActive: true,
+          isFeatured: !!v.isFeatured,
+          favoritesCount: (v.favoritesCount as number) ?? 0,
+          expiresAt: v.expiresAt,
+          badge: v.badge as string | undefined,
+          createdAt: v.createdAt as Offer["createdAt"],
+        };
+      });
+
+      const active = raw.filter((o) => !isOfferExpired(o.expiresAt));
+      const sorted = sortTopByFavoritesThenRecent(active);
+      if (cancelled) return;
+      setTopOffers(sorted.slice(0, 6));
+      setLoading(false);
     }
 
-    run();
-  }, []);
+    run().catch((e) => {
+      console.error(e);
+      if (!cancelled) {
+        setLoadError("Impossible de charger les offres. Réessayez.");
+        setTopOffers([]);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [retryKey]);
 
   const smartRanking = topOffers.slice(0, 3);
 
@@ -118,14 +134,24 @@ export default function HomePage() {
       {loadError ? (
         <div
           role="alert"
-          className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-100"
+          className="flex flex-col gap-3 rounded-2xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between"
         >
-          <p className="font-semibold text-amber-950 dark:text-amber-50">Offres momentanément indisponibles</p>
-          <p className="mt-1 leading-relaxed text-amber-900/95 dark:text-amber-100/90">{loadError}</p>
+          <div>
+            <p className="font-semibold text-amber-950 dark:text-amber-50">Offres momentanément indisponibles</p>
+            <p className="mt-1 text-sm leading-relaxed text-amber-900 dark:text-amber-100/95">{loadError}</p>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            className="shrink-0 self-start sm:self-auto"
+            onClick={() => setRetryKey((k) => k + 1)}
+          >
+            Réessayer
+          </Button>
         </div>
       ) : null}
 
-      <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:gap-10">
+      <section className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-10">
         <div className="flex flex-col justify-center gap-5 sm:gap-6">
           <Badge variant="success">Nouveau sur {BRAND_NAME}</Badge>
 
@@ -171,7 +197,11 @@ export default function HomePage() {
 
           <div className="grid w-full gap-3">
             {loading ? (
-              <p className="text-sm font-medium text-slate-600">Chargement…</p>
+              <div className="grid gap-4" aria-busy aria-label="Chargement des tendances">
+                <OfferRowSkeleton />
+                <OfferRowSkeleton />
+                <OfferRowSkeleton />
+              </div>
             ) : smartRanking.length === 0 ? (
               <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
                 Aucune offre à afficher pour le moment. Revenez bientôt ou ouvrez le catalogue complet.
@@ -205,7 +235,7 @@ export default function HomePage() {
         </Card>
       </section>
 
-      <section className="grid gap-5">
+      <section className="grid gap-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -225,22 +255,27 @@ export default function HomePage() {
         </div>
 
         {loading ? (
-          <p className="text-sm font-medium text-slate-600">Chargement…</p>
+          <div className="grid gap-5 sm:grid-cols-2" aria-busy aria-label="Chargement des offres">
+            <OfferCardSkeleton />
+            <OfferCardSkeleton />
+            <OfferCardSkeleton />
+            <OfferCardSkeleton />
+          </div>
         ) : topOffers.length === 0 ? (
-          <Card className="p-8">
-            <p className="text-center text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-              Aucune offre pour l’instant. Utilisez les catégories ci-dessus ou consultez le catalogue complet.
+          <Card className="border-dashed border-slate-300 p-8 dark:border-slate-600">
+            <p className="text-center text-sm font-medium leading-relaxed text-slate-800 dark:text-slate-200">
+              Aucune offre pour l’instant. Parcourez les catégories ci-dessus ou ouvrez le catalogue complet.
             </p>
           </Card>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-6 sm:grid-cols-2">
             {topOffers.map((offer) => {
               const b = computeBadge(offer);
               const exp = formatExpiryLabel(offer.expiresAt);
               return (
                 <Card
                   key={offer.id}
-                  className="flex flex-col gap-4 transition-shadow hover:shadow-md dark:hover:shadow-none"
+                  className="group flex flex-col gap-4 overflow-hidden transition-all duration-200 hover:-translate-y-[1px] hover:shadow-lg hover:shadow-slate-900/5 hover:ring-emerald-100/80 active:translate-y-0 active:shadow-md dark:hover:shadow-none dark:hover:ring-emerald-900/20"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <Badge variant={badgeVariant(b)}>{b}</Badge>
@@ -255,12 +290,13 @@ export default function HomePage() {
                       alt={`Visuel : ${offer.title}`}
                       width={640}
                       height={360}
-                      className="aspect-[16/10] h-auto w-full object-cover"
+                      className="aspect-[16/10] h-auto w-full object-cover transition-transform duration-200 group-hover:scale-[1.02] group-active:scale-[1.01]"
                     />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/10 via-transparent to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
                   </div>
 
                   <div className="min-w-0">
-                    <h3 className="text-lg font-bold leading-snug text-slate-900 dark:text-white">
+                    <h3 className="text-lg font-extrabold leading-snug tracking-tight text-slate-900 dark:text-white">
                       {offer.title}
                     </h3>
                     <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
