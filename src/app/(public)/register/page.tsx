@@ -8,7 +8,7 @@ export default function RegisterPage() {
       <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Inscription</h1>
       <Card className="grid gap-4">
         <RegisterForm />
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-slate-600">
           Déjà inscrit ?{" "}
           <Link className="font-semibold text-emerald-600" href="/login">
             Se connecter

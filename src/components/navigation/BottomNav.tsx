@@ -5,14 +5,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { usePreferences } from "../providers/PreferencesProvider";
 import { useAuth } from "../providers/AuthProvider";
-import { isAdminEmail } from "../../lib/admin";
+import { canShowPublicAdminUi } from "../../lib/admin";
 
 const iconClass = "h-6 w-6 shrink-0 stroke-[1.75]";
 
 function IconHome({ active }: { active: boolean }) {
   return (
     <svg
-      className={`${iconClass} ${active ? "text-emerald-600" : "text-slate-600"}`}
+      className={`${iconClass} ${active ? "text-emerald-600" : "text-slate-700"}`}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -30,7 +30,7 @@ function IconHome({ active }: { active: boolean }) {
 function IconTag({ active }: { active: boolean }) {
   return (
     <svg
-      className={`${iconClass} ${active ? "text-emerald-600" : "text-slate-600"}`}
+      className={`${iconClass} ${active ? "text-emerald-600" : "text-slate-700"}`}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -49,7 +49,7 @@ function IconTag({ active }: { active: boolean }) {
 function IconPlus({ active }: { active: boolean }) {
   return (
     <svg
-      className={`${iconClass} ${active ? "text-emerald-600" : "text-slate-600"}`}
+      className={`${iconClass} ${active ? "text-emerald-600" : "text-slate-700"}`}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -63,7 +63,7 @@ function IconPlus({ active }: { active: boolean }) {
 function IconReceipt({ active }: { active: boolean }) {
   return (
     <svg
-      className={`${iconClass} ${active ? "text-emerald-600" : "text-slate-600"}`}
+      className={`${iconClass} ${active ? "text-emerald-600" : "text-slate-700"}`}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -78,7 +78,7 @@ function IconReceipt({ active }: { active: boolean }) {
 function IconHeart({ active }: { active: boolean }) {
   return (
     <svg
-      className={`${iconClass} ${active ? "text-emerald-600" : "text-slate-600"}`}
+      className={`${iconClass} ${active ? "text-emerald-600" : "text-slate-700"}`}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -92,7 +92,7 @@ function IconHeart({ active }: { active: boolean }) {
 function IconUser({ active }: { active: boolean }) {
   return (
     <svg
-      className={`${iconClass} ${active ? "text-emerald-600" : "text-slate-600"}`}
+      className={`${iconClass} ${active ? "text-emerald-600" : "text-slate-700"}`}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -107,7 +107,7 @@ function IconUser({ active }: { active: boolean }) {
 function IconShield({ active }: { active: boolean }) {
   return (
     <svg
-      className={`${iconClass} ${active ? "text-emerald-600" : "text-slate-600"}`}
+      className={`${iconClass} ${active ? "text-emerald-600" : "text-slate-700"}`}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -138,13 +138,13 @@ export function BottomNav() {
 
   if (navStyle === "top") return null;
 
-  const showAdmin = isAdminEmail(user?.email);
+  const showAdmin = canShowPublicAdminUi(user?.email);
 
   const linkClass = (active: boolean) =>
     `flex min-h-[52px] min-w-[3.5rem] shrink-0 flex-col items-center justify-center gap-1 rounded-2xl px-2 py-1.5 text-center text-[11px] font-semibold leading-tight tracking-tight transition active:scale-[0.98] sm:min-w-[4rem] ${
       active
-        ? "bg-emerald-50 text-emerald-800"
-        : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+        ? "bg-emerald-50 text-emerald-900"
+        : "text-slate-800 hover:bg-slate-50 hover:text-slate-900"
     }`;
 
   return (

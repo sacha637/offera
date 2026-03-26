@@ -392,7 +392,7 @@ export default function OfferDetailPage() {
                   className="group/link flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition hover:-translate-y-[1px] hover:border-emerald-300 hover:bg-emerald-50/40 hover:text-emerald-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-emerald-500/50 dark:hover:bg-emerald-950/25"
                 >
                   <span className="min-w-0 truncate">{l.label || `Lien ${idx + 1}`}</span>
-                  <span className="shrink-0 text-slate-500 transition group-hover/link:text-emerald-700 dark:text-slate-400 dark:group-hover/link:text-emerald-300">
+                  <span className="shrink-0 text-slate-600 transition group-hover/link:text-emerald-700 dark:text-slate-400 dark:group-hover/link:text-emerald-300">
                     Ouvrir →
                   </span>
                 </Link>

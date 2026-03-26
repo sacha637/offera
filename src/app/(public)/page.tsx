@@ -138,7 +138,7 @@ export default function HomePage() {
         >
           <div>
             <p className="font-semibold text-amber-950 dark:text-amber-50">Offres momentanément indisponibles</p>
-            <p className="mt-1 text-sm leading-relaxed text-amber-900 dark:text-amber-100/95">{loadError}</p>
+            <p className="mt-1 text-sm leading-relaxed text-amber-900 dark:text-amber-100">{loadError}</p>
           </div>
           <Button
             type="button"
@@ -159,7 +159,7 @@ export default function HomePage() {
             Bons plans en magasin, réductions à combiner, offres limitées.
           </h1>
 
-          <p className="text-base leading-relaxed text-slate-700 dark:text-slate-300 sm:text-lg">
+          <p className="text-base leading-relaxed text-slate-600 dark:text-slate-300 sm:text-lg">
             {BRAND_NAME} met en avant des offres concrètes en point de vente : promos, codes et bons plans
             selon les conditions affichées par chaque enseigne.
           </p>
@@ -238,7 +238,7 @@ export default function HomePage() {
       <section className="grid gap-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
               Sélection
             </p>
             <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">

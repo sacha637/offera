@@ -54,7 +54,7 @@ export default function OfferSuggestPage() {
     );
   }, [user?.uid, submitting, title, partner, link]);
 
-  if (loading) return <p className="text-slate-500">Chargement…</p>;
+  if (loading) return <p className="text-slate-600">Chargement…</p>;
 
   if (!user) {
     return (

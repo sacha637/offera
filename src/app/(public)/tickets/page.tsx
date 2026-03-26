@@ -89,7 +89,7 @@ export default function TicketsPage() {
     );
   }, [uid, title, store, file, submitting]);
 
-  if (loading) return <p className="text-slate-500">Chargement…</p>;
+  if (loading) return <p className="text-slate-600">Chargement…</p>;
   if (!user) return null;
 
   async function onSubmit() {
@@ -156,7 +156,7 @@ export default function TicketsPage() {
     <div className="grid gap-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
             Après achat
           </p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
@@ -204,7 +204,7 @@ export default function TicketsPage() {
             </ul>
           </div>
 
-          <label className="cursor-pointer rounded-3xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500 hover:border-emerald-400 dark:border-slate-700">
+          <label className="cursor-pointer rounded-3xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-600 hover:border-emerald-400 dark:border-slate-700">
             <input
               type="file"
               accept="image/*"
@@ -247,9 +247,9 @@ export default function TicketsPage() {
         </div>
 
         {loadingTickets && tickets.length === 0 ? (
-          <p className="text-sm text-slate-500">Chargement des tickets…</p>
+          <p className="text-sm text-slate-600">Chargement des tickets…</p>
         ) : tickets.length === 0 ? (
-          <p className="text-sm text-slate-500">Aucun ticket envoyé pour l’instant.</p>
+          <p className="text-sm text-slate-600">Aucun ticket envoyé pour l’instant.</p>
         ) : (
           <div className="grid gap-4">
             {tickets.map((t) => (

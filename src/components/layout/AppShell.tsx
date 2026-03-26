@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AppHeader } from "./AppHeader";
 import { BottomNav } from "../navigation/BottomNav";
 import { useAuth } from "../providers/AuthProvider";
-import { canShowAdminButton } from "../../lib/admin";
+import { canShowPublicAdminUi } from "../../lib/admin";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -28,7 +28,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {children}
       </main>
 
-      {canShowAdminButton(user?.email) && (
+      {canShowPublicAdminUi(user?.email) && (
         <Link
           href="/admin/offers"
           className="fixed bottom-24 right-4 z-40 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-[11px] font-semibold text-slate-600 backdrop-blur hover:text-emerald-600 md:bottom-4"

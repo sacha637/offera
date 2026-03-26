@@ -15,7 +15,7 @@ export default function AccountPage() {
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
 
-  if (loading) return <p className="text-slate-500">Chargement…</p>;
+  if (loading) return <p className="text-slate-600">Chargement…</p>;
   if (!user) return null;
 
   return (

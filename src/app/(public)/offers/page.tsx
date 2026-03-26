@@ -185,7 +185,7 @@ export default function OffersPage() {
     <div className="flex flex-col gap-8 sm:gap-10">
       <header className="flex flex-col gap-4 border-b border-slate-200/90 pb-6 dark:border-slate-800 sm:flex-row sm:items-end sm:justify-between">
         <div className="max-w-2xl">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
             Catalogue
           </p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
