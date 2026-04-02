@@ -38,7 +38,8 @@ service cloud.firestore {
     }
 
     match /categories/{categoryId} {
-      allow read: if resource.data.active == true;
+      // Public : catégories actives. Admin : lecture de toutes (édition CRUD, slugs uniques).
+      allow read: if isAdmin() || resource.data.active == true;
       allow create, update, delete: if isAdmin();
     }
 

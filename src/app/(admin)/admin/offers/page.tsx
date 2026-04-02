@@ -16,16 +16,54 @@ import {
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { db, getFirebaseStorage } from "../../../../lib/firebase/client";
+import { fetchCategoriesForUi } from "../../../../lib/firebase/categories";
 import { useAuth } from "../../../../components/providers/AuthProvider";
 import { isAdminEmail } from "../../../../lib/admin";
+import { splitCatalogByType } from "../../../../lib/catalog";
+import {
+  firstLinkUrl,
+  linksToFirestorePayload,
+  normalizeOfferLinks,
+  type OfferLinkItem,
+} from "../../../../lib/offerLinks";
+import { normalizeOfferCategories, normalizeOfferStores, resolveCategoryLabels } from "../../../../lib/offerCategories";
+import type { Category } from "../../../../lib/types";
+
+type LinkTypeOpt = "" | NonNullable<OfferLinkItem["type"]>;
+
+type OfferLinkForm = {
+  title: string;
+  description: string;
+  url: string;
+  type: LinkTypeOpt;
+};
+
+function emptyLinkRow(): OfferLinkForm {
+  return { title: "", description: "", url: "", type: "" };
+}
+
+function linksFormFromFirestore(v: Record<string, unknown>): OfferLinkForm[] {
+  const n = normalizeOfferLinks(v);
+  if (n.length === 0) return [emptyLinkRow()];
+  return n.map((x) => ({
+    title: x.title,
+    description: x.description ?? "",
+    url: x.url,
+    type: (x.type ?? "") as LinkTypeOpt,
+  }));
+}
 
 type Offer = {
   id: string;
   title: string;
   description: string;
+  /** Libellé legacy (première catégorie ou texte historique) */
   category: string;
-  /** URLs uniquement — compat anciennes offres : on garde aussi `link` à l’écriture */
-  links: string[];
+  /** Thèmes (types) */
+  categories: string[];
+  /** Enseignes */
+  stores: string[];
+  linkRows: OfferLinkForm[];
   imageUrl: string;
   isActive: boolean;
   isFeatured: boolean;
@@ -36,30 +74,16 @@ type Offer = {
 const emptyForm: Omit<Offer, "id"> = {
   title: "",
   description: "",
-  category: "Tech",
-  links: [""],
+  category: "Autre",
+  categories: [],
+  stores: [],
+  linkRows: [emptyLinkRow()],
   imageUrl: "",
   isActive: true,
   isFeatured: false,
   expiresAt: "",
   favoritesCount: 0,
 };
-
-/** Normalise Firestore -> liste d’URLs (string[] ou ancien format {label,url}) */
-function linksFromFirestore(v: Record<string, unknown>): string[] {
-  const raw = v.links;
-  if (Array.isArray(raw)) {
-    if (raw.length === 0) return [""];
-    if (typeof raw[0] === "string") {
-      return raw.map((s) => String(s).trim()).filter(Boolean);
-    }
-    return (raw as { url?: string }[])
-      .map((x) => (x?.url ?? "").trim())
-      .filter(Boolean);
-  }
-  const single = typeof v.link === "string" ? v.link.trim() : "";
-  return single ? [single] : [""];
-}
 
 export default function AdminOffersPage() {
   const { user } = useAuth();
@@ -76,6 +100,12 @@ export default function AdminOffersPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [dragActive, setDragActive] = useState(false);
+  const [categoryOptions, setCategoryOptions] = useState<Category[]>([]);
+
+  const { themes: themeOptions, stores: storeOptions } = useMemo(
+    () => splitCatalogByType(categoryOptions),
+    [categoryOptions]
+  );
 
   const canSubmit = useMemo(() => {
     return form.title.trim().length > 0 && form.description.trim().length > 0;
@@ -88,13 +118,14 @@ export default function AdminOffersPage() {
 
     const data = snap.docs.map((d) => {
       const v = d.data() as Record<string, unknown>;
-      const linkList = linksFromFirestore(v);
       return {
         id: d.id,
         title: (v.title as string) ?? "",
         description: (v.description as string) ?? "",
         category: (v.category as string) ?? "Autre",
-        links: linkList.length ? linkList : [""],
+        categories: normalizeOfferCategories(v),
+        stores: normalizeOfferStores(v),
+        linkRows: linksFormFromFirestore(v),
         imageUrl: (v.imageUrl as string) ?? "",
         isActive: !!v.isActive,
         isFeatured: !!v.isFeatured,
@@ -154,6 +185,12 @@ export default function AdminOffersPage() {
   }, []);
 
   useEffect(() => {
+    fetchCategoriesForUi(db)
+      .then(setCategoryOptions)
+      .catch(() => setCategoryOptions([]));
+  }, []);
+
+  useEffect(() => {
     if (!user?.uid) {
       setFirestoreAdminRole(null);
       return;
@@ -178,13 +215,29 @@ export default function AdminOffersPage() {
         ? Timestamp.fromDate(new Date(`${form.expiresAt}T23:59:59`))
         : null;
 
-      const linksClean = form.links.map((u) => u.trim()).filter(Boolean);
+      const linkItems = linksToFirestorePayload(
+        form.linkRows.map((r) => ({
+          title: r.title,
+          description: r.description.trim() || undefined,
+          url: r.url,
+          type: r.type || undefined,
+        }))
+      );
+      const primaryUrl = firstLinkUrl(linkItems);
+      const primaryLabel =
+        form.categories
+          .map((id) => categoryOptions.find((c) => c.id === id)?.name)
+          .find((n) => n && n.trim()) ??
+        form.categories[0] ??
+        "Autre";
       const payload = {
         title: form.title.trim(),
         description: form.description.trim(),
-        category: form.category.trim() || "Autre",
-        links: linksClean,
-        link: linksClean[0] ?? "",
+        categories: form.categories,
+        stores: form.stores,
+        category: typeof primaryLabel === "string" ? primaryLabel : "Autre",
+        links: linkItems,
+        link: primaryUrl,
         imageUrl: (fileUrl ?? form.imageUrl).trim(),
         isActive: form.isActive,
         isFeatured: form.isFeatured,
@@ -229,19 +282,36 @@ export default function AdminOffersPage() {
         ? Timestamp.fromDate(new Date(`${form.expiresAt}T23:59:59`))
         : null;
 
-      const linksClean = form.links.map((u) => u.trim()).filter(Boolean);
+      const linkItems = linksToFirestorePayload(
+        form.linkRows.map((r) => ({
+          title: r.title,
+          description: r.description.trim() || undefined,
+          url: r.url,
+          type: r.type || undefined,
+        }))
+      );
+      const primaryUrl = firstLinkUrl(linkItems);
       const imageFinal = (fileUrl ?? form.imageUrl).trim();
       if (!imageFinal) {
         setError("Ajoute une image (fichier ou URL).");
         return;
       }
 
+      const primaryLabel =
+        form.categories
+          .map((id) => categoryOptions.find((c) => c.id === id)?.name)
+          .find((n) => n && n.trim()) ??
+        form.categories[0] ??
+        "Autre";
+
       await updateDoc(doc(db, "offers", editingId), {
         title: form.title.trim(),
         description: form.description.trim(),
-        category: form.category.trim() || "Autre",
-        links: linksClean,
-        link: linksClean[0] ?? "",
+        categories: form.categories,
+        stores: form.stores,
+        category: typeof primaryLabel === "string" ? primaryLabel : "Autre",
+        links: linkItems,
+        link: primaryUrl,
         imageUrl: imageFinal,
         isActive: form.isActive,
         isFeatured: form.isFeatured,
@@ -273,7 +343,9 @@ export default function AdminOffersPage() {
       title: o.title,
       description: o.description,
       category: o.category,
-      links: o.links.length ? [...o.links] : [""],
+      categories: o.categories.length ? [...o.categories] : [],
+      stores: o.stores.length ? [...o.stores] : [],
+      linkRows: o.linkRows.length ? o.linkRows.map((r) => ({ ...r })) : [emptyLinkRow()],
       imageUrl: o.imageUrl,
       isActive: o.isActive,
       isFeatured: o.isFeatured,
@@ -344,16 +416,69 @@ export default function AdminOffersPage() {
             />
           </label>
 
-          <label className="text-sm">
-            Catégorie
-            <input
-              className="mt-1 w-full rounded-xl border p-2"
-              value={form.category}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, category: e.target.value }))
-              }
-            />
-          </label>
+          <div className="text-sm md:col-span-2">
+            <span className="font-medium">Thèmes (catégories)</span>
+            <p className="mb-2 mt-1 text-xs text-slate-500">
+              Types d’offre (beauté, alimentaire…). Les entrées « enseigne » sont cochées plus bas.
+            </p>
+            <div className="flex max-h-48 flex-wrap gap-x-4 gap-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3 dark:border-slate-600">
+              {themeOptions.length === 0 ? (
+                <span className="text-xs text-slate-500">
+                  Aucun thème (catégories sans type « enseigne », ou mock).
+                </span>
+              ) : (
+                themeOptions.map((c) => (
+                  <label key={c.id} className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="rounded border-slate-300"
+                      checked={form.categories.includes(c.id)}
+                      onChange={() => {
+                        setForm((f) => {
+                          const next = new Set(f.categories);
+                          if (next.has(c.id)) next.delete(c.id);
+                          else next.add(c.id);
+                          return { ...f, categories: [...next] };
+                        });
+                      }}
+                    />
+                    {c.name}
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="text-sm md:col-span-2">
+            <span className="font-medium">Enseignes</span>
+            <p className="mb-2 mt-1 text-xs text-slate-500">
+              Marques / magasins — créez des catégories avec type « Enseigne » dans Admin → Catégories.
+            </p>
+            <div className="flex max-h-48 flex-wrap gap-x-4 gap-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3 dark:border-slate-600">
+              {storeOptions.length === 0 ? (
+                <span className="text-xs text-slate-500">Aucune enseigne définie (type « store »).</span>
+              ) : (
+                storeOptions.map((c) => (
+                  <label key={c.id} className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="rounded border-slate-300"
+                      checked={form.stores.includes(c.id)}
+                      onChange={() => {
+                        setForm((f) => {
+                          const next = new Set(f.stores);
+                          if (next.has(c.id)) next.delete(c.id);
+                          else next.add(c.id);
+                          return { ...f, stores: [...next] };
+                        });
+                      }}
+                    />
+                    {c.name}
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
 
           <label className="text-sm md:col-span-2">
             Description
@@ -367,43 +492,97 @@ export default function AdminOffersPage() {
             />
           </label>
 
-          <div className="text-sm md:col-span-2 grid gap-2">
-            <span className="font-medium">Liens (plusieurs URLs)</span>
-            <p className="text-xs text-slate-500">
-              Stockage Firestore : <code className="rounded bg-slate-100 px-1">links</code> (tableau
-              d’URLs) + <code className="rounded bg-slate-100 px-1">link</code> = premier lien (compat).
-            </p>
-            {form.links.map((url, idx) => (
-              <div key={idx} className="flex gap-2">
-                <input
-                  className="mt-1 w-full rounded-xl border p-2"
-                  placeholder="https://..."
-                  value={url}
-                  onChange={(e) => {
-                    const next = [...form.links];
-                    next[idx] = e.target.value;
-                    setForm((f) => ({ ...f, links: next }));
-                  }}
-                />
-                <button
-                  type="button"
-                  className="mt-1 shrink-0 rounded-xl border px-3 py-2 text-xs"
-                  disabled={form.links.length <= 1}
-                  onClick={() =>
-                    setForm((f) => ({
-                      ...f,
-                      links: f.links.filter((_, i) => i !== idx),
-                    }))
-                  }
-                >
-                  Retirer
-                </button>
+          <div className="text-sm md:col-span-2 grid gap-3">
+            <div>
+              <span className="font-medium">Liens (cartes)</span>
+              <p className="mt-1 text-xs text-slate-500">
+                Chaque entrée = titre + URL + optionnel description et type. Le champ{" "}
+                <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">link</code> conserve le 1er
+                URL (compat).
+              </p>
+            </div>
+            {form.linkRows.map((row, idx) => (
+              <div
+                key={idx}
+                className="grid gap-2 rounded-xl border border-slate-200 p-3 dark:border-slate-600 md:grid-cols-2"
+              >
+                <label className="text-xs font-medium md:col-span-2">
+                  Titre
+                  <input
+                    className="mt-1 w-full rounded-lg border p-2 text-sm"
+                    placeholder="Coupon immédiat"
+                    value={row.title}
+                    onChange={(e) => {
+                      const next = [...form.linkRows];
+                      next[idx] = { ...next[idx], title: e.target.value };
+                      setForm((f) => ({ ...f, linkRows: next }));
+                    }}
+                  />
+                </label>
+                <label className="text-xs font-medium md:col-span-2">
+                  URL
+                  <input
+                    className="mt-1 w-full rounded-lg border p-2 text-sm"
+                    placeholder="https://..."
+                    value={row.url}
+                    onChange={(e) => {
+                      const next = [...form.linkRows];
+                      next[idx] = { ...next[idx], url: e.target.value };
+                      setForm((f) => ({ ...f, linkRows: next }));
+                    }}
+                  />
+                </label>
+                <label className="text-xs font-medium md:col-span-2">
+                  Description courte (optionnel)
+                  <input
+                    className="mt-1 w-full rounded-lg border p-2 text-sm"
+                    value={row.description}
+                    onChange={(e) => {
+                      const next = [...form.linkRows];
+                      next[idx] = { ...next[idx], description: e.target.value };
+                      setForm((f) => ({ ...f, linkRows: next }));
+                    }}
+                  />
+                </label>
+                <label className="text-xs font-medium">
+                  Type
+                  <select
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm dark:border-slate-600 dark:bg-slate-900"
+                    value={row.type}
+                    onChange={(e) => {
+                      const next = [...form.linkRows];
+                      next[idx] = { ...next[idx], type: e.target.value as LinkTypeOpt };
+                      setForm((f) => ({ ...f, linkRows: next }));
+                    }}
+                  >
+                    <option value="">—</option>
+                    <option value="coupon">Coupon</option>
+                    <option value="odr">ODR</option>
+                    <option value="shop">Magasin / shop</option>
+                    <option value="other">Autre</option>
+                  </select>
+                </label>
+                <div className="flex items-end justify-end">
+                  <button
+                    type="button"
+                    className="rounded-lg border px-3 py-2 text-xs"
+                    disabled={form.linkRows.length <= 1}
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        linkRows: f.linkRows.filter((_, i) => i !== idx),
+                      }))
+                    }
+                  >
+                    Retirer
+                  </button>
+                </div>
               </div>
             ))}
             <button
               type="button"
               className="rounded-xl border border-slate-300 px-3 py-2 text-sm w-fit"
-              onClick={() => setForm((f) => ({ ...f, links: [...f.links, ""] }))}
+              onClick={() => setForm((f) => ({ ...f, linkRows: [...f.linkRows, emptyLinkRow()] }))}
             >
               + Ajouter un lien
             </button>
@@ -535,11 +714,17 @@ export default function AdminOffersPage() {
           <p className="text-sm text-slate-500">Chargement…</p>
         ) : (
           <div className="grid gap-3">
-            {offers.map((o) => (
+            {offers.map((o) => {
+              const catLabels = resolveCategoryLabels(o.categories, categoryOptions);
+              const storeLabels = resolveCategoryLabels(o.stores, categoryOptions);
+              const catLine =
+                [catLabels.join(" · "), storeLabels.join(" · ")].filter(Boolean).join(" • ") ||
+                o.category;
+              return (
               <div key={o.id} className="rounded-xl border p-3">
                 <div className="font-semibold">{o.title}</div>
                 <div className="text-xs text-slate-500">
-                  {o.category} • active: {String(o.isActive)} • featured:{" "}
+                  {catLine} • active: {String(o.isActive)} • featured:{" "}
                   {String(o.isFeatured)} • favs: {o.favoritesCount ?? 0}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -569,7 +754,8 @@ export default function AdminOffersPage() {
                   </button>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>

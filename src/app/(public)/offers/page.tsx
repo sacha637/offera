@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
@@ -10,9 +10,17 @@ import { Input } from "../../../components/ui/Input";
 
 import { db } from "../../../lib/firebase/client";
 import { fetchPublicOffersResult } from "../../../lib/firebase/publicOffers";
+import { fetchCategoriesForUi } from "../../../lib/firebase/categories";
+import { splitCatalogByType } from "../../../lib/catalog";
 import { OfferCardSkeleton } from "../../../components/ui/Skeleton";
-import { categories } from "../../../lib/mock";
 import { filterAndSortOffers, isOfferExpired } from "../../../lib/offersDisplay";
+import {
+  normalizeOfferCategories,
+  normalizeOfferStores,
+  resolveCategoryLabels,
+  sortedUniqueDisplayLabels,
+} from "../../../lib/offerCategories";
+import type { Category } from "../../../lib/types";
 
 import { useAuth } from "../../../components/providers/AuthProvider";
 import { isOfferFavorited, toggleFavorite } from "../../../lib/firebase/favorites";
@@ -23,6 +31,8 @@ type Offer = {
   partner?: string;
   description?: string;
   category?: string;
+  categories?: string[];
+  stores?: string[];
   imageUrl?: string;
   link?: string;
   links?: { label: string; url: string }[];
@@ -53,18 +63,41 @@ export default function OffersPage() {
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [storeFilter, setStoreFilter] = useState<string | null>(null);
+  const [categoryCatalog, setCategoryCatalog] = useState<Category[]>([]);
+
+  const { themes: themeCatalog, stores: storeCatalog } = useMemo(
+    () => splitCatalogByType(categoryCatalog),
+    [categoryCatalog]
+  );
 
   const [favMap, setFavMap] = useState<Record<string, boolean>>({});
   const [favBusyId, setFavBusyId] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
+    fetchCategoriesForUi(db)
+      .then(setCategoryCatalog)
+      .catch(() => setCategoryCatalog([]));
+  }, []);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const cat = params.get("cat");
-    if (cat && categories.some((c) => c.id === cat)) {
-      setCategoryFilter(cat);
-    }
+    const st = params.get("store");
+    if (cat && themeCatalog.some((c) => c.id === cat)) setCategoryFilter(cat);
+    if (st && storeCatalog.some((c) => c.id === st)) setStoreFilter(st);
+  }, [themeCatalog, storeCatalog]);
+
+  const syncFiltersUrl = useCallback((cat: string | null, store: string | null) => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (cat) url.searchParams.set("cat", cat);
+    else url.searchParams.delete("cat");
+    if (store) url.searchParams.set("store", store);
+    else url.searchParams.delete("store");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
   }, []);
 
   useEffect(() => {
@@ -138,18 +171,21 @@ export default function OffersPage() {
       filterAndSortOffers(offers, {
         search,
         categoryId: categoryFilter,
-        categories,
+        storeId: storeFilter,
+        themeCategories: themeCatalog,
+        storeCategories: storeCatalog,
       }),
-    [offers, search, categoryFilter]
+    [offers, search, categoryFilter, storeFilter, themeCatalog, storeCatalog]
   );
 
   function setCategory(cat: string | null) {
     setCategoryFilter(cat);
-    if (typeof window === "undefined") return;
-    const url = new URL(window.location.href);
-    if (cat) url.searchParams.set("cat", cat);
-    else url.searchParams.delete("cat");
-    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+    syncFiltersUrl(cat, storeFilter);
+  }
+
+  function setStore(st: string | null) {
+    setStoreFilter(st);
+    syncFiltersUrl(categoryFilter, st);
   }
 
   async function onToggleFav(offerId: string) {
@@ -192,7 +228,7 @@ export default function OffersPage() {
             Offres
           </h1>
           <p className="mt-2 text-base leading-relaxed text-slate-700 dark:text-slate-300">
-            Bons plans en magasin et en ligne : recherche, catégories, tri par pertinence puis popularité.
+            Bons plans en magasin et en ligne : recherche, thèmes, enseignes, tri par pertinence puis popularité.
           </p>
         </div>
 
@@ -211,13 +247,13 @@ export default function OffersPage() {
 
         <div className="flex flex-col gap-2">
           <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
-            Catégories
+            Thèmes
           </p>
           <div className="flex flex-wrap gap-2">
             <Chip active={categoryFilter === null} type="button" onClick={() => setCategory(null)}>
-              Toutes
+              Tous
             </Chip>
-            {categories.map((category) => (
+            {themeCatalog.map((category) => (
               <Chip
                 key={category.id}
                 active={categoryFilter === category.id}
@@ -225,6 +261,27 @@ export default function OffersPage() {
                 onClick={() => setCategory(category.id === categoryFilter ? null : category.id)}
               >
                 {category.name}
+              </Chip>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+            Enseignes
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Chip active={storeFilter === null} type="button" onClick={() => setStore(null)}>
+              Toutes
+            </Chip>
+            {storeCatalog.map((s) => (
+              <Chip
+                key={s.id}
+                active={storeFilter === s.id}
+                type="button"
+                onClick={() => setStore(s.id === storeFilter ? null : s.id)}
+              >
+                {s.name}
               </Chip>
             ))}
           </div>
@@ -286,8 +343,14 @@ export default function OffersPage() {
             <Button variant="secondary" type="button" onClick={() => setSearch("")}>
               Effacer la recherche
             </Button>
-            <Button type="button" onClick={() => setCategory(null)}>
-              Afficher toutes les catégories
+            <Button
+              type="button"
+              onClick={() => {
+                setCategory(null);
+                setStore(null);
+              }}
+            >
+              Réinitialiser les filtres
             </Button>
           </div>
         </Card>
@@ -362,9 +425,46 @@ export default function OffersPage() {
                 </div>
 
                 <div className="mt-auto flex flex-col gap-3 border-t border-slate-100 pt-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                    {offer.category ?? "Autre"}
-                  </span>
+                  <div className="flex min-w-0 flex-wrap gap-1.5">
+                    {(() => {
+                      const rec = offer as Record<string, unknown>;
+                      const themeLabels = sortedUniqueDisplayLabels(
+                        resolveCategoryLabels(normalizeOfferCategories(rec), themeCatalog)
+                      );
+                      const storeLabels = sortedUniqueDisplayLabels(
+                        resolveCategoryLabels(normalizeOfferStores(rec), storeCatalog)
+                      );
+                      const themes =
+                        themeLabels.length > 0 ? themeLabels : offer.category?.trim() ? [offer.category.trim()] : [];
+                      return (
+                        <>
+                          {themes.map((label, i) => (
+                            <Badge
+                              key={`${offer.id}-th-${i}`}
+                              variant="success"
+                              className="text-xs font-semibold"
+                            >
+                              {label}
+                            </Badge>
+                          ))}
+                          {storeLabels.map((label, i) => (
+                            <Badge
+                              key={`${offer.id}-st-${i}`}
+                              variant="info"
+                              className="text-xs font-semibold ring-1 ring-slate-200/80 dark:ring-slate-600"
+                            >
+                              {label}
+                            </Badge>
+                          ))}
+                          {themes.length === 0 && storeLabels.length === 0 ? (
+                            <Badge variant="success" className="text-xs font-semibold">
+                              Autre
+                            </Badge>
+                          ) : null}
+                        </>
+                      );
+                    })()}
+                  </div>
 
                   <Link
                     href={`/offers/${encodeURIComponent(String(offer.id))}`}

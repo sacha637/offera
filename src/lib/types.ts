@@ -15,7 +15,12 @@ export type Offer = {
   qrEnabled?: boolean;
 };
 
+/** Catégorie catalogue (mock ou Firestore `categories/{id}`). */
 export type Category = {
   id: string;
   name: string;
+  slug?: string;
+  /** ex. "theme" | "store" */
+  type?: string;
+  active?: boolean;
 };

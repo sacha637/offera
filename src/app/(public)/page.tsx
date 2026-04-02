@@ -2,14 +2,16 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, LinkButton } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Card } from "../../components/ui/Card";
 
-import { categories } from "../../lib/mock";
 import { BRAND_NAME } from "../../lib/brand";
 import { db } from "../../lib/firebase/client";
+import { fetchCategoriesForUi } from "../../lib/firebase/categories";
+import { splitCatalogByType } from "../../lib/catalog";
+import type { Category } from "../../lib/types";
 import { fetchPublicOffersResult } from "../../lib/firebase/publicOffers";
 import { isOfferExpired, sortTopByFavoritesThenRecent } from "../../lib/offersDisplay";
 import { OfferCardSkeleton, OfferRowSkeleton } from "../../components/ui/Skeleton";
@@ -67,6 +69,18 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const [categoryChips, setCategoryChips] = useState<Category[]>([]);
+
+  const { themes: homeThemeChips } = useMemo(
+    () => splitCatalogByType(categoryChips),
+    [categoryChips]
+  );
+
+  useEffect(() => {
+    fetchCategoriesForUi(db)
+      .then(setCategoryChips)
+      .catch(() => setCategoryChips([]));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -174,7 +188,7 @@ export default function HomePage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
+            {homeThemeChips.map((category) => (
               <Link key={category.id} href={`/offers?cat=${encodeURIComponent(category.id)}`} className={chipLinkClass}>
                 {category.name}
               </Link>

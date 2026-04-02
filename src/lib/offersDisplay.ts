@@ -1,4 +1,9 @@
 import type { Category } from "./types";
+import {
+  categoriesSearchBlob,
+  normalizeOfferCategories,
+  normalizeOfferStores,
+} from "./offerCategories";
 
 /** Champ absent ou true = visible publiquement ; false masque explicitement. */
 export function isOfferPubliclyActive(v: { isActive?: unknown }): boolean {
@@ -24,20 +29,25 @@ function foldForSearch(s: string): string {
     .toLowerCase();
 }
 
-/** Filtre par catégorie (libellé admin vs id mock) */
+/** Filtre catalogue (thèmes ou enseignes) : matche si l’une des entrées offre correspond à la puce sélectionnée. */
 export function offerMatchesCategory(
-  offerCategory: string | undefined,
+  offerCategoryStrings: string[],
   selectedCategoryId: string | null,
   allCategories: Category[]
 ): boolean {
   if (!selectedCategoryId) return true;
   const cat = allCategories.find((c) => c.id === selectedCategoryId);
   if (!cat) return true;
-  const o = foldForSearch((offerCategory ?? "").trim());
-  if (!o) return false;
+  if (offerCategoryStrings.length === 0) return false;
   const name = foldForSearch(cat.name);
-  const id = foldForSearch(cat.id);
-  return o === name || o === id || o.includes(name) || name.includes(o);
+  const idFold = foldForSearch(cat.id);
+  for (const raw of offerCategoryStrings) {
+    const o = foldForSearch(raw.trim());
+    if (!o) continue;
+    if (o === idFold) return true;
+    if (o === name || o.includes(name) || name.includes(o)) return true;
+  }
+  return false;
 }
 
 /** Score de pertinence recherche (plus haut = mieux) */
@@ -47,6 +57,7 @@ export function searchRelevanceScore(
     description?: string;
     partner?: string;
     category?: string;
+    categories?: string[];
   },
   rawQuery: string
 ): number {
@@ -55,7 +66,10 @@ export function searchRelevanceScore(
   const t = foldForSearch(offer.title ?? "");
   const d = foldForSearch(offer.description ?? "");
   const p = foldForSearch(offer.partner ?? "");
-  const c = foldForSearch(offer.category ?? "");
+  const rec = offer as Record<string, unknown>;
+  const catBlob = categoriesSearchBlob(normalizeOfferCategories(rec));
+  const storeBlob = categoriesSearchBlob(normalizeOfferStores(rec));
+  const c = foldForSearch(`${catBlob} ${storeBlob}`);
   let s = 0;
   if (t.includes(q)) s += 100;
   if (t.startsWith(q)) s += 30;
@@ -72,29 +86,49 @@ type OfferSortable = {
   description?: string;
   partner?: string;
   category?: string;
+  categories?: string[];
+  stores?: string[];
   isFeatured?: boolean;
   favoritesCount?: number;
   createdAt?: { toMillis?: () => number };
 };
 
-/** Tri liste /offers : recherche + catégorie + featured + favoris + récence */
+/** Tri liste /offers : recherche + filtres thème / enseigne + featured + favoris + récence */
 export function filterAndSortOffers<T extends OfferSortable>(
   offers: T[],
   options: {
     search: string;
     categoryId: string | null;
-    categories: Category[];
+    storeId: string | null;
+    themeCategories: Category[];
+    storeCategories: Category[];
   }
 ): T[] {
-  const { search, categoryId, categories } = options;
+  const { search, categoryId, storeId, themeCategories, storeCategories } = options;
   const q = foldForSearch(search.trim());
 
-  let list = offers.filter((o) => offerMatchesCategory(o.category, categoryId, categories));
+  let list = offers.filter((o) => {
+    const rec = o as Record<string, unknown>;
+    const okTheme = offerMatchesCategory(
+      normalizeOfferCategories(rec),
+      categoryId,
+      themeCategories
+    );
+    const okStore = offerMatchesCategory(
+      normalizeOfferStores(rec),
+      storeId,
+      storeCategories
+    );
+    return okTheme && okStore;
+  });
 
   if (q) {
     list = list.filter((o) => {
+      const rec = o as Record<string, unknown>;
       const hay = foldForSearch(
-        `${o.title ?? ""} ${o.description ?? ""} ${o.partner ?? ""} ${o.category ?? ""}`
+        `${o.title ?? ""} ${o.description ?? ""} ${o.partner ?? ""} ${categoriesSearchBlob(
+          normalizeOfferCategories(rec)
+        )} ${categoriesSearchBlob(normalizeOfferStores(rec))}`
       );
       return hay.includes(q);
     });

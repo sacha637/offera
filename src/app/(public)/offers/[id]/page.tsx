@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   doc,
   getDoc,
@@ -15,14 +15,20 @@ import { Badge } from "../../../../components/ui/Badge";
 import { Button } from "../../../../components/ui/Button";
 import { Card } from "../../../../components/ui/Card";
 import { Skeleton } from "../../../../components/ui/Skeleton";
+import { OfferLinkCards } from "../../../../components/offers/OfferLinkCards";
 import { db } from "../../../../lib/firebase/client";
+import { fetchCategoriesForUi } from "../../../../lib/firebase/categories";
+import { splitCatalogByType } from "../../../../lib/catalog";
+import { normalizeOfferLinks } from "../../../../lib/offerLinks";
 import { isOfferExpired } from "../../../../lib/offersDisplay";
+import {
+  normalizeOfferCategories,
+  normalizeOfferStores,
+  resolveCategoryLabels,
+  sortedUniqueDisplayLabels,
+} from "../../../../lib/offerCategories";
 import { useAuth } from "../../../../components/providers/AuthProvider";
-
-type OfferLink = {
-  label: string;
-  url: string;
-};
+import type { Category } from "../../../../lib/types";
 
 type Offer = {
   id: string;
@@ -31,11 +37,12 @@ type Offer = {
   partner?: string;
   description?: string;
   category?: string;
+  categories?: string[];
+  stores?: string[];
   imageUrl?: string;
 
   link?: string;
-  /** Ancien format {label,url} ou nouveau format string[] (URLs) */
-  links?: OfferLink[] | string[];
+  links?: unknown;
 
   expiresAt?: any;
   isFeatured?: boolean;
@@ -58,10 +65,22 @@ export default function OfferDetailPage() {
 
   const [offer, setOffer] = useState<Offer | null>(null);
   const [loading, setLoading] = useState(true);
+  const [categoryCatalog, setCategoryCatalog] = useState<Category[]>([]);
 
   // Favoris
   const [favLoading, setFavLoading] = useState(false);
   const [isFav, setIsFav] = useState(false);
+
+  useEffect(() => {
+    fetchCategoriesForUi(db)
+      .then(setCategoryCatalog)
+      .catch(() => setCategoryCatalog([]));
+  }, []);
+
+  const { themes: themeCat, stores: storeCat } = useMemo(
+    () => splitCatalogByType(categoryCatalog),
+    [categoryCatalog]
+  );
 
   useEffect(() => {
     if (!id) return;
@@ -111,27 +130,23 @@ export default function OfferDetailPage() {
     checkFav();
   }, [user?.uid, id]);
 
-  const finalLinks: OfferLink[] = (() => {
-    if (!offer?.links || !Array.isArray(offer.links) || offer.links.length === 0) {
-      return offer?.link?.trim()
-        ? [{ label: "Ouvrir l’offre", url: offer.link.trim() }]
-        : [];
-    }
-    const first = offer.links[0];
-    if (typeof first === "string") {
-      return (offer.links as string[])
-        .map((url, i) => ({ label: `Lien ${i + 1}`, url: url.trim() }))
-        .filter((l) => l.url.length > 0);
-    }
-    return (offer.links as OfferLink[])
-      .map((l) => ({
-        label: (l?.label ?? "").trim(),
-        url: (l?.url ?? "").trim(),
-      }))
-      .filter((l) => l.url.length > 0);
-  })();
-
   const expired = offer ? isOfferExpired(offer.expiresAt) : false;
+
+  const normalizedLinks = offer ? normalizeOfferLinks(offer as Record<string, unknown>) : [];
+
+  const themeLabels = offer
+    ? sortedUniqueDisplayLabels(
+        resolveCategoryLabels(normalizeOfferCategories(offer as Record<string, unknown>), themeCat)
+      )
+    : [];
+  const storeLabels = offer
+    ? sortedUniqueDisplayLabels(
+        resolveCategoryLabels(normalizeOfferStores(offer as Record<string, unknown>), storeCat)
+      )
+    : [];
+
+  const themeLabelsDisplay =
+    themeLabels.length > 0 ? themeLabels : offer?.category?.trim() ? [offer.category.trim()] : [];
 
   const imgSrc =
     typeof offer?.imageUrl === "string" && offer.imageUrl.trim().length > 0
@@ -318,6 +333,38 @@ export default function OfferDetailPage() {
               {offer.partner}
             </p>
           ) : null}
+          {themeLabelsDisplay.length > 0 || storeLabels.length > 0 ? (
+            <div className="flex flex-col gap-2 pt-1">
+              {themeLabelsDisplay.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Thèmes
+                  </span>
+                  {themeLabelsDisplay.map((label, i) => (
+                    <Badge key={`th-${i}`} variant="success" className="text-xs font-semibold">
+                      {label}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+              {storeLabels.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Enseignes
+                  </span>
+                  {storeLabels.map((label, i) => (
+                    <Badge
+                      key={`st-${i}`}
+                      variant="info"
+                      className="text-xs font-semibold ring-1 ring-slate-200/80 dark:ring-slate-600"
+                    >
+                      {label}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         {offer.description?.trim() ? (
@@ -345,24 +392,15 @@ export default function OfferDetailPage() {
             <h2 className="mt-1 text-lg font-bold tracking-tight text-slate-900 dark:text-white">
               Profiter de l’offre
             </h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              Utilisez les liens ci-dessous — chaque bouton ouvre une destination précise (magasin, site, appli…).
+            </p>
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          {finalLinks[0]?.url ? (
-            <a href={finalLinks[0].url} target="_blank" rel="noreferrer" className="block">
-              <Button className="w-full">Ouvrir l’offre</Button>
-            </a>
-          ) : (
-            <Button className="w-full" disabled>
-              Aucun lien disponible
-            </Button>
-          )}
-
-          <Button onClick={toggleFavorite} disabled={favLoading} variant="secondary" className="w-full">
-            {isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
-          </Button>
-        </div>
+        <Button onClick={toggleFavorite} disabled={favLoading} variant="secondary" className="w-full sm:max-w-sm">
+          {isFav ? "Retirer des favoris" : "Ajouter aux favoris"}
+        </Button>
 
         <ul className="mt-1 list-disc space-y-1 pl-6 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
           <li>Consultez les conditions chez l’enseigne (dates, produits concernés, magasins participants).</li>
@@ -372,41 +410,11 @@ export default function OfferDetailPage() {
       </Card>
 
       <div className="grid gap-3 md:grid-cols-2">
-        <Card className="grid gap-2">
+        <Card id="offer-links" className="scroll-mt-24 grid gap-3">
           <p className="text-sm font-semibold text-slate-900 dark:text-white">
             Liens
           </p>
-
-          {finalLinks.length === 0 ? (
-            <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-              Aucun lien renseigné pour cette offre.
-            </p>
-          ) : (
-            <div className="grid gap-2">
-              {finalLinks.map((l, idx) => (
-                <Link
-                  key={`${l.url}-${idx}`}
-                  href={l.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group/link flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition hover:-translate-y-[1px] hover:border-emerald-300 hover:bg-emerald-50/40 hover:text-emerald-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-emerald-500/50 dark:hover:bg-emerald-950/25"
-                >
-                  <span className="min-w-0 truncate">{l.label || `Lien ${idx + 1}`}</span>
-                  <span className="shrink-0 text-slate-600 transition group-hover/link:text-emerald-700 dark:text-slate-400 dark:group-hover/link:text-emerald-300">
-                    Ouvrir →
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
-
-          {finalLinks[0]?.url ? (
-            <a href={finalLinks[0].url} target="_blank" rel="noreferrer">
-              <Button variant="secondary" className="w-full">
-                Ouvrir le lien principal
-              </Button>
-            </a>
-          ) : null}
+          <OfferLinkCards links={normalizedLinks} expired={!!expired} />
         </Card>
 
         <Card className="grid gap-2">
